@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoraggio MFP Network</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+    <div class="container mx-auto p-6">
+        <header class="mb-6">
+            <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-print text-blue-600"></i> Gestione Parco Stampanti MFP
+            </h1>
+            <p class="text-sm text-slate-500">Seleziona una multifunzione dalla lista per visualizzare i dettagli in tempo reale</p>
+        </header>
+
+        <!-- Layout Master-Detail (2 Colonne) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- COLONNA SINISTRA: Lista MFP (Master) -->
+            <div class="lg:col-span-4 bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-200 font-semibold text-slate-700 flex justify-between items-center">
+                    <span>Stampanti In Rete (<%= mfpList.length %>)</span>
+                    <i class="fa-solid fa-network-wired text-slate-400"></i>
+                </div>
+                
+                <div class="divide-y divide-slate-100 max-h-[650px] overflow-y-auto" id="mfp-list">
+                    <% mfpList.forEach(mfp => { %>
+                        <div onclick="selectMfp('<%= mfp.ipv4 %>', this)" 
+                             class="mfp-item p-4 cursor-pointer hover:bg-blue-50 transition-colors flex items-center justify-between border-l-4 border-transparent"
+                             data-ip="<%= mfp.ip %>">
+                            <div>
+                                <%= JSON.stringify(mfp.IPV4) %>
+                                <div class="font-bold text-slate-900"><%= mfp.model || 'MFP Generica' %></div>
+                                <div class="text-xs text-slate-500 font-mono"><%= mfp.IPV4?mfp.IPV4.localIPv+" ":"err" %></div>
+                                <div class="text-xs text-slate-400"><%= mfp.vendor || 'Unknown Vendor' %></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="inline-block w-3 h-3 rounded-full <%= mfp.isOnline ? 'bg-emerald-500' : 'bg-rose-500' %>" 
+                                      title="<%= mfp.isOnline ? 'Online' : 'Offline' %>"></span>
+                                <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+
+            <!-- COLONNA DESTRA: Tabbed Pane (Detail) -->
+            <div class="lg:col-span-8 bg-white rounded-lg shadow border border-slate-200 flex flex-col">
+                
+                <!-- Intestazione MFP Selezionata -->
+                <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center" id="detail-header">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800" id="selected-model">Seleziona una stampante</h2>
+                        <span class="text-xs font-mono text-slate-500" id="selected-ip">IP: ---.---.---.---</span>
+                    </div>
+                    <span id="selected-status" class="px-2.5 py-1 text-xs rounded-full font-medium bg-slate-200 text-slate-600">
+                        In attesa di selezione
+                    </span>
+                </div>
+
+                <!-- Navigazione TAB -->
+                <div class="border-b border-slate-200 bg-white">
+                    <nav class="flex -mb-px px-4 gap-6" id="tab-nav">
+                        <button onclick="switchTab('tab-toner', this)" class="tab-btn py-3 px-1 border-b-2 border-blue-600 font-medium text-sm text-blue-600 flex items-center gap-2">
+                            <i class="fa-solid fa-fill-drip"></i> Consumabili
+                        </button>
+                        <button onclick="switchTab('tab-counters', this)" class="tab-btn py-3 px-1 border-b-2 border-transparent font-medium text-sm text-slate-500 hover:text-slate-700 flex items-center gap-2">
+                            <i class="fa-solid fa-calculator"></i> Contatori
+                        </button>
+                        <button onclick="switchTab('tab-status', this)" class="tab-btn py-3 px-1 border-b-2 border-transparent font-medium text-sm text-slate-500 hover:text-slate-700 flex items-center gap-2">
+                            <i class="fa-solid fa-circle-exclamation"></i> Stato & Display
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Contenuto dei TAB -->
+                <div class="p-6 flex-1 min-h-[450px]">
+                    
+                    <!-- TAB 1: CONSUMABILI -->
+                    <div id="tab-toner" class="tab-content">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-4 uppercase tracking-wider">Livelli Toner & Serbatoi</h3>
+                        <div id="toner-container" class="space-y-4">
+                            <p class="text-sm text-slate-400 italic">Nessuna MFP selezionata.</p>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: CONTATORI -->
+                    <div id="tab-counters" class="tab-content hidden">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-4 uppercase tracking-wider">Volumetria Pagine Stampate</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="counters-container">
+                            <p class="text-sm text-slate-400 italic col-span-3">Nessuna MFP selezionata.</p>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: STATO & DISPLAY -->
+                    <div id="tab-status" class="tab-content hidden">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-4 uppercase tracking-wider">Pannello e Coda Allarmi</h3>
+                        
+                        <!-- Box Display LCD -->
+                        <div class="mb-6 bg-slate-900 text-emerald-400 font-mono p-4 rounded-md border-2 border-slate-700 shadow-inner">
+                            <div class="text-xs text-slate-500 mb-1 flex justify-between">
+                                <span>DISPLAY CONSOLE</span>
+                                <i class="fa-solid fa-desktop"></i>
+                            </div>
+                            <div id="lcd-display-text" class="text-sm leading-relaxed">---</div>
+                        </div>
+
+                        <!-- Allarmi Attivi -->
+                        <div class="border rounded-md p-4 bg-slate-50">
+                            <h4 class="text-xs font-bold text-slate-700 mb-2">ALLARMI REGISTRATI (prtAlertTable)</h4>
+                            <div id="alerts-container" class="space-y-2 text-sm">
+                                <span class="text-slate-400 italic">Nessun evento registrato.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Script Javascript Client-side -->
+    <script>
+       
+    </script>
+       <!-- Collegamento al file JavaScript esterno -->
+    <script src="/js/main.js"></script>
+</body>
+</html>

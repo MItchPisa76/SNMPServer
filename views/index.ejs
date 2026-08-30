@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoraggio Host & MFP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .progress-thin { height: 18px; font-size: 11px; font-weight: bold; }
+        .token-truncate { max-width: 140px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+    </style>
+</head>
+<body class="bg-light p-3 p-md-5">
+
+<div class="container-fluid">
+    <h1 class="mb-4"><i class="bi bi-cpu-fill"></i> Monitoraggio Host e Dispositivi MFP</h1>
+
+    <% if (!hosts || hosts.length === 0) { %>
+        <div class="alert alert-warning">Nessun host trovato nel sistema.</div>
+    <% } else { %>
+
+        <% hosts.forEach((host) => { %>
+            <div class="card mb-4 shadow-sm border-0">
+                
+                <!-- HEADER HOST -->
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <h4 class="mb-0 text-warning"><i class="bi bi-server"></i> <%= host.hostname || (host.IPV4 ? host.IPV4.localHostName : 'Host Sconosciuto') %></h4>
+                        <small class="text-white-50">
+                            IP: <code><%= host.IPV4 ? host.IPV4.localIPv4 : 'N/D' %></code> 
+                            <%= (host.IPV4 && host.IPV4.localIF) ? `(${host.IPV4.localIF})` : '' %>
+                        </small>
+                    </div>
+                    <div>
+                        <span class="badge bg-secondary token-truncate d-inline-block" title="<%= host.token %>">
+                            Token: <%= host.token %>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    
+                    <!-- SEZIONE CRAWLER (Comandi Generali Host) -->
+                    <div class="row mb-4 bg-body-tertiary p-3 rounded mx-0 align-items-center">
+                        <div class="col-12 mb-2">
+                            <h6 class="text-uppercase text-muted fw-bold mb-0" style="font-size: 0.75rem;">
+                                <i class="bi bi-robot"></i> Gestione Comandi Crawler Host
+                            </h6>
+                        </div>
+
+                        <% 
+                            function getStatus(val) {
+                                if (!val) return 'OFF';
+                                const normalized = String(val).toLowerCase().trim();
+                                if (normalized === 'true' || normalized === 'on') return 'ON';
+                                if (normalized === 'once') return 'ONCE';
+                                return 'OFF';
+                            }
+                        %>
+
+                        <div class="col-md-12 d-flex flex-wrap gap-3 align-items-center">
+                            
+                            <!-- Parametro: findNewHosts -->
+                            <% let stFind = getStatus(host.crawler ? host.crawler.findNewHosts : null); %>
+                            <div class="d-flex align-items-center bg-white p-2 rounded border">
+                                <span class="me-2 small fw-bold">Find New Hosts:</span>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn crawler-btn <%= stFind === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="findNewHosts" data-value="true">ON</button>
+                                    <button type="button" class="btn crawler-btn <%= stFind === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="findNewHosts" data-value="false">OFF</button>
+                                    <button type="button" class="btn crawler-btn <%= stFind === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="findNewHosts" data-value="once">ONCE</button>
+                                </div>
+                            </div>
+
+                            <!-- Parametro: forceResend -->
+                            <% let stForce = getStatus(host.crawler ? host.crawler.forceResend : null); %>
+                            <div class="d-flex align-items-center bg-white p-2 rounded border">
+                                <span class="me-2 small fw-bold">Force Resend:</span>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn crawler-btn <%= stForce === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="forceResend" data-value="true">ON</button>
+                                    <button type="button" class="btn crawler-btn <%= stForce === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="forceResend" data-value="false">OFF</button>
+                                    <button type="button" class="btn crawler-btn <%= stForce === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="forceResend" data-value="once">ONCE</button>
+                                </div>
+                            </div>
+
+                            <!-- Parametro: refreshoids -->
+                            <% let stOid = getStatus(host.crawler ? host.crawler.refreshoids : null); %>
+                            <div class="d-flex align-items-center bg-white p-2 rounded border">
+                                <span class="me-2 small fw-bold">OIDs:</span>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn crawler-btn <%= stOid === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshoids" data-value="true">ON</button>
+                                    <button type="button" class="btn crawler-btn <%= stOid === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshoids" data-value="false">OFF</button>
+                                    <button type="button" class="btn crawler-btn <%= stOid === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshoids" data-value="once">ONCE</button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- LISTA MFP INTERROGATE -->
+                    <h5 class="mt-4 mb-3"><i class="bi bi-printer-fill"></i> Stampanti Interrogate (<%= host.listaDati ? host.listaDati.length : 0 %>)</h5>
+
+                    <% if (!host.listaDati || host.listaDati.length === 0) { %>
+                        <div class="alert alert-info mb-0">Nessuna MFP registrata o dati non ancora acquisiti per questo host.</div>
+                    <% } else { %>
+
+                        <% host.listaDati.forEach((mfp) => { %>
+                            <% 
+                                const info = mfp.datainfo || {};
+                                const modello = info['1.3.6.1.4.1.236.11.5.1.1.1.1.0'] || info['1.3.6.1.2.1.1.5.0'] || 'Modello Sconosciuto';
+                                const statoOnline = info['mtc.offline'] || 'N/D';
+                                const isOnline = statoOnline.startsWith('ONLINE');
+                            %>
+
+                            <div class="card mb-4 border shadow-sm">
+                                
+                                <!-- Header Singola Stampante -->
+                                <div class="card-header d-flex justify-content-between align-items-center <%= isOnline ? 'bg-success-subtle' : 'bg-danger-subtle' %>">
+                                    <div>
+                                        <strong><%= modello %></strong> 
+                                        <span class="ms-2 text-muted">(S/N: <code><%= mfp.serial %></code></span>
+                                         <span class="ms-2 text-muted">IPv4: <code><%= mfp.ipv4 %></code>)</span>
+                                    </div>
+                                    <div>
+                                        <span class="badge <%= isOnline ? 'bg-success' : 'bg-danger' %>"><%= statoOnline %></span>
+                                    </div>
+                                </div>
+
+                                <div class="card-body">
+                                    
+                                    <!-- TABBERPANE PER OGNI STAMPANTE -->
+                                    <ul class="nav nav-tabs mb-3" id="mfpTab-<%= mfp.serial %>" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active small py-2 fw-bold" id="status-tab-<%= mfp.serial %>" data-bs-toggle="tab" data-bs-target="#status-pane-<%= mfp.serial %>" type="button" role="tab">
+                                                <i class="bi bi-speedometer2"></i> Stato & Consumabili
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link small py-2 fw-bold" id="queryoids-tab-<%= mfp.serial %>" data-bs-toggle="tab" data-bs-target="#queryoids-pane-<%= mfp.serial %>" type="button" role="tab">
+                                                <i class="bi bi-search"></i> Query OIDs
+                                            </button>
+                                        </li>
+                                    </ul>
+
+                                    <div class="tab-content" id="mfpTabContent-<%= mfp.serial %>">
+                                        
+                                        <!-- TAB 1: CONSUMABILI ED ALERT -->
+                                        <div class="tab-pane fade show active" id="status-pane-<%= mfp.serial %>" role="tabpanel">
+                                            <div class="row">
+                                                
+                                                <!-- Consumabili -->
+                                                <div class="col-lg-7 mb-3 mb-lg-0">
+                                                    <h6 class="fw-bold">Consumabili e Componenti</h6>
+                                                    <% if (mfp.dataconsumabili) { %>
+                                                        <% Object.keys(mfp.dataconsumabili).forEach(key => { 
+                                                            const item = mfp.dataconsumabili[key];
+                                                            const val = parseInt(item.value, 10) || 0;
+                                                            const max = parseInt(item.max, 10) || 1;
+                                                            const percent = Math.min(100, Math.round((val / max) * 100));
+                                                            
+                                                            let barColor = 'bg-primary';
+                                                            if (item.type === 'Toner') barColor = 'bg-dark';
+                                                            if (percent > 85) barColor = 'bg-warning';
+                                                            if (percent >= 95) barColor = 'bg-danger';
+                                                        %>
+                                                            <div class="mb-2">
+                                                                <div class="d-flex justify-content-between small">
+                                                                    <span><strong><%= item.name %></strong> (<%= item.type %>)</span>
+                                                                    <span><%= val %> / <%= max %> <%= item.unitsS1 %> (<%= percent %>%)</span>
+                                                                </div>
+                                                                <div class="progress progress-thin">
+                                                                    <div class="progress-bar <%= barColor %>" role="progressbar" style="width: <%= percent %>%;">
+                                                                        <%= percent %>%
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        <% }); %>
+                                                    <% } else { %>
+                                                        <p class="text-muted small">Dati consumabili non disponibili.</p>
+                                                    <% } %>
+                                                </div>
+
+                                                <!-- Alert -->
+                                                <div class="col-lg-5">
+                                                    <h6 class="fw-bold">Alert & Notifiche</h6>
+                                                    <% 
+                                                        let hasAlerts = false;
+                                                        if (mfp.dataalerts) {
+                                                            Object.keys(mfp.dataalerts).forEach(aKey => {
+                                                                const alert = mfp.dataalerts[aKey];
+                                                                if (alert.description && alert.description.trim() !== '') {
+                                                                    hasAlerts = true;
+                                                    %>
+                                                                    <div class="alert alert-warning p-2 small mb-2">
+                                                                        <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                                                                        <strong>Livello <%= alert.severity %>:</strong> <%= alert.description %>
+                                                                        <div class="text-muted mt-1" style="font-size: 10px;">Attivo da: <%= alert.time %></div>
+                                                                    </div>
+                                                    <% 
+                                                                }
+                                                            });
+                                                        }
+                                                        if (!hasAlerts) {
+                                                    %>
+                                                        <div class="alert alert-light border p-2 text-success small mb-0">
+                                                            <i class="bi bi-check-circle-fill"></i> Nessun alert attivo.
+                                                        </div>
+                                                    <% } %>
+                                                </div>
+
+                                            </div>
+                                        </div>
+
+                                        <!-- TAB 2: QUERY OIDS SPECIFICO PER QUESTA STAMPANTE -->
+                                        <div class="tab-pane fade" id="queryoids-pane-<%= mfp.serial %>" role="tabpanel">
+                                            <div class="bg-light p-3 rounded border">
+                                                <h6 class="fw-bold mb-2"><i class="bi bi-terminal"></i> Invia Query OID personalizzata a questa MFP</h6>
+                                                <form class="queryoids-form row g-2 align-items-center" 
+                                                      data-token="<%= host.token %>" 
+                                                      data-ipv4="<%= mfp.ipv4 %>"
+                                                      data-serial="<%= mfp.serial %>">
+
+                                                    <div class="col-md-9 col-lg-10">
+                                                        <div class="input-group input-group-sm">
+                                                            <span class="input-group-text bg-white text-muted">OID</span>
+                                                            <input type="text" class="form-control queryoids-input" 
+                                                                   placeholder="Es. 1.3.6.1.2.1.1.1.0, 1.3.6.1.2.1.1.5.0" 
+                                                                   value="<%= (host.crawler && host.crawler.queryoids) ? host.crawler.queryoids : '' %>">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-3 col-lg-2">
+                                                        <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                            <i class="bi bi-send"></i> Invia Query
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+
+                                    </div> <!-- /tab-content -->
+                                </div>
+                            </div>
+
+                        <% }); %>
+                    <% } %>
+                </div>
+            </div>
+        <% }); %>
+
+    <% } %>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

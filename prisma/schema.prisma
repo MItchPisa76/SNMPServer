@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  name  String
+  email String @unique
+}
+
+model oids {
+  oid         String
+  brandShort  String?
+  vendoroid   String?
+  descrizione String?
+  short       String?
+  priority    Int     @default(-1)
+  mode        Int?    @default(0)
+  id          Int     @id @unique(map: "sqlite_autoindex_oids_1") @default(autoincrement())
+}
+
+model hosts {
+  hostname  String?
+  token     String  @id
+  options   String?
+  IPV4      String?
+  crawler   String?
+  dati      Bytes?
+  listaDati dati[]
+}
+
+model dati {
+  id              Int     @id @unique(map: "sqlite_autoindex_dati_1") @default(autoincrement())
+  serial          String  @unique(map: "sqlite_autoindex_dati_2")
+  datainfo        String?
+  dataconsumabili Bytes?
+  datacontatori   String?
+  dataalerts      String?
+  token           String
+  ipv4            String?
+  hosts           hosts   @relation(fields: [token], references: [token])
+}

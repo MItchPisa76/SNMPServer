@@ -1,0 +1,28 @@
+body { 
+    font-family: sans-serif; 
+    max-width: 500px; 
+    margin: 40px auto; 
+    padding: 0 20px; 
+}
+form { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+    margin-top: 20px; 
+}
+input, button { 
+    padding: 8px; 
+    font-size: 16px; 
+}
+button { 
+    background: #0070f3; 
+    color: white; 
+    border: none; 
+    cursor: pointer; 
+}
+.error-msg { 
+    color: red; 
+    font-weight: bold; 
+    margin-top: 10px; 
+    display: none; 
+}
