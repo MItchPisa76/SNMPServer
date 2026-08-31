@@ -33,7 +33,26 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/oid/:oid', async (req, res) => {
+    const oid = req.params.oid;
+    console.log(oid);
+    try {
 
+        const resp = await prisma.oids.findMany({
+            where: {
+                oid: oid
+            }
+        });
+        console.log("   risposta:", resp);
+
+        res.send(resp[0]);
+
+    } catch (error) {
+        console.log('Errore:', error);
+
+        res.status(500).send(error);
+    }
+});
 
 // 1. ROTTA PAGINA INIZIALE
 app.get('/', async (req, res) => {
@@ -329,6 +348,33 @@ server.get('/oids/vendor/:vendor', async (req, res) => {
         res.status(500).send(error);
     }
 });
+
+server.post('/snmpquery', async (req, res) => {
+    console.log(req);
+    try {
+        const token = req.headers["token"];
+        const OID = req.headers["OID"];
+        if (token == null) {
+            res.status(500).send("Errore token");
+            return;
+        }
+
+        const res = await prisma.hosts.update({
+            where: {
+                token: token
+            }, data: {
+                dati: JSON.stringify(req.body)
+            },
+        });
+        console.log('Good' + OID, res);
+        res.send("OKK" + OID);
+    } catch (error) {
+        console.log('Errore:', error);
+
+        res.status(500).send(error);
+    }
+});
+
 
 // MODIFICA: Creiamo il server HTTPS passando i certificati e l'app Express
 https.createServer(sslOptions, app).listen(PORT, () => {
