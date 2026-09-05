@@ -383,3 +383,11 @@ https.createServer(sslOptions, app).listen(PORT, () => {
 https.createServer(sslOptions, server).listen(PORT + 1, () => {
     console.log(`Server dati sicuro attivo su https://localhost:${PORT + 1}`);
 });
+
+
+//openssl pkcs12 -export -in cert.pem -inkey key.pem -out keystore.p12 -name "mykey"
+//openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj '/CN=localhost'
+//keytool -importcert -alias resolve-server -file server.crt -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit -noprompt
+
+//openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj '/CN=localhost'
+//keytool -importcert -alias nodejs-server -file cert.pem -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit -noprompt
