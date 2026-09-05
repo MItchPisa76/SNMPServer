@@ -1,0 +1,31 @@
+name: Sync SSL Cert to Java Client Repo
+
+on:
+  push:
+    paths:
+      # Scatta solo quando il certificato nella root viene modificato
+      - 'cert.pem'
+
+jobs:
+  sync-secret:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Controlla il codice sorgente
+      uses: actions/checkout@v4
+
+    - name: Aggiorna Secret su Repository Client Java
+      env:
+        GH_TOKEN: ${{ secrets.PAT_SECRET_SYNC }}
+      run: |
+        # Legge il certificato pubblico dalla root del progetto
+        CERT_PATH="cert.pem"
+        
+        if [ -f "$CERT_PATH" ]; then
+          # Usa GitHub CLI per aggiornare il Secret nel repository client
+          gh secret set LOCAL_SERVER_CERT --repo MitchPisa76/MFPCrawler < "$CERT_PATH"
+          echo "Secret LOCAL_SERVER_CERT aggiornato con successo su MitchPisa76/MFPCrawler!"
+        else
+          echo "Errore: File $CERT_PATH non trovato nella root del progetto."
+          exit 1
+        fi
