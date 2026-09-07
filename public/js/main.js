@@ -1,5 +1,102 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+    // ==========================================
+    // 1. SISTEMA DI REFRESH PAGINA
+    // ==========================================
+    const refreshBtn = document.getElementById('btn-refresh-now');
+    const refreshSelect = document.getElementById('auto-refresh-select');
+    const lastUpdateSpan = document.getElementById('last-update-time');
+    let refreshTimer = null;
+
+    // Imposta l'orario dell'ultimo aggiornamento
+    if (lastUpdateSpan) {
+        lastUpdateSpan.textContent = `Ultimo aggiornamento: ${new Date().toLocaleTimeString()}`;
+    }
+
+    // Refresh manuale
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => location.reload());
+    }
+
+    // Gestione timer auto-refresh
+    function startAutoRefresh(seconds) {
+        if (refreshTimer) clearInterval(refreshTimer);
+        if (seconds > 0) {
+            refreshTimer = setInterval(() => {
+                location.reload();
+            }, seconds * 1000);
+        }
+    }
+
+    if (refreshSelect) {
+        // Ripristina preferenza salvata in localStorage se presente
+        const savedInterval = localStorage.getItem('mfp_refresh_interval');
+        if (savedInterval !== null) {
+            refreshSelect.value = savedInterval;
+        }
+
+        startAutoRefresh(parseInt(refreshSelect.value, 10));
+
+        refreshSelect.addEventListener('change', (e) => {
+            const val = parseInt(e.target.value, 10);
+            localStorage.setItem('mfp_refresh_interval', val);
+            startAutoRefresh(val);
+        });
+    }
+
+    // ==========================================
+    // 2. RIPRISTINO E SALVATAGGIO STATO COLLAPSE
+    // ==========================================
+    // Mantiene aperte le sezioni stampante che l'utente ha espanso prima del refresh
+    const collapseElements = document.querySelectorAll('.collapse[id^="collapse-mfp-"]');
+    
+    collapseElements.forEach(el => {
+        const id = el.getAttribute('id');
+        if (localStorage.getItem(id) === 'open') {
+            const bsCollapse = new bootstrap.Collapse(el, { show: true });
+        }
+
+        el.addEventListener('shown.bs.collapse', () => {
+            localStorage.setItem(id, 'open');
+        });
+
+        el.addEventListener('hidden.bs.collapse', () => {
+            localStorage.setItem(id, 'closed');
+        });
+    });
+
+    // ==========================================
+    // 3. AZIONI PULSANTI CRAWLER (API POST)
+    // ==========================================
+    document.querySelectorAll('.crawler-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const token = e.target.dataset.token;
+            const action = e.target.dataset.action;
+            const value = e.target.dataset.value;
+
+            try {
+                const res = await fetch('/api/crawler/actions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token, action, value })
+                });
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('Errore durante l\'aggiornamento dell\'azione.');
+                }
+            } catch (err) {
+                console.error('Errore chiamata API:', err);
+            }
+        });
+    });
+});
+
+
+
+if (1==0)
+document.addEventListener('DOMContentLoaded', () => {
+
     // Cache in memoria per evitare di richiamare lo stesso OID più volte
     const oidCache = {};
 

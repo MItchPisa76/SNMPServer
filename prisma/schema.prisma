@@ -4,13 +4,39 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
 }
 
 model User {
   id    Int    @id @default(autoincrement())
   name  String
   email String @unique
+}
+
+model customer {
+  tokenI String @unique(map: "sqlite_autoindex_customer_1")
+  name   String
+  id     Int    @id @unique(map: "sqlite_autoindex_customer_2") @default(autoincrement())
+}
+
+model dati {
+  serial          String  @id
+  datainfo        String?
+  dataconsumabili Bytes?
+  datacontatori   String?
+  dataalerts      Bytes?
+  token           String
+  data            Bytes?
+  hosts           hosts   @relation(fields: [token], references: [token])
+}
+
+model hosts {
+  hostname   String?
+  token      String  @unique(map: "sqlite_autoindex_hosts_1")
+  options    Bytes?
+  IPV4       String?
+  crawler    String?
+  customerID String
+  dati       dati[]
 }
 
 model oids {
@@ -22,26 +48,4 @@ model oids {
   priority    Int     @default(-1)
   mode        Int?    @default(0)
   id          Int     @id @unique(map: "sqlite_autoindex_oids_1") @default(autoincrement())
-}
-
-model hosts {
-  hostname  String?
-  token     String  @id
-  options   String?
-  IPV4      String?
-  crawler   String?
-  dati      Bytes?
-  listaDati dati[]
-}
-
-model dati {
-  id              Int     @id @unique(map: "sqlite_autoindex_dati_1") @default(autoincrement())
-  serial          String  @unique(map: "sqlite_autoindex_dati_2")
-  datainfo        String?
-  dataconsumabili Bytes?
-  datacontatori   String?
-  dataalerts      String?
-  token           String
-  ipv4            String?
-  hosts           hosts   @relation(fields: [token], references: [token])
 }

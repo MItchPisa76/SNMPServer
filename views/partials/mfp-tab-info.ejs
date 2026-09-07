@@ -1,0 +1,66 @@
+<div class="tab-pane fade" id="info-pane-<%= mfp.serial %>" role="tabpanel">
+    <h6 class="fw-bold mb-3"><i class="bi bi-card-heading"></i> Informazioni Generali Dispositivo (datainfo)</h6>
+
+    <% if (mfp.datainfo && Object.keys(mfp.datainfo).length > 0) { %>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover table-striped border align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" style="width: 20%;">OID</th>
+                        <th scope="col" style="width: 15%;">Short</th>
+                        <th scope="col" style="width: 15%;">Brand Short</th>
+                        <th scope="col" style="width: 25%;">Descrizione</th>
+                        <th scope="col" style="width: 25%;">Valore Restituito</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% Object.keys(mfp.datainfo).forEach(oidKey => { %>
+                        <tr class="oid-row" data-oid="<%= oidKey %>">
+                            <td><code><%= oidKey %></code></td>
+                            <td class="oid-short text-muted"><span class="spinner-border spinner-border-sm" role="status"></span></td>
+                            <td class="oid-brand text-muted"><span class="spinner-border spinner-border-sm" role="status"></span></td>
+                            <td class="oid-desc text-muted"><span class="spinner-border spinner-border-sm" role="status"></span></td>
+                            <td class="text-break"><strong><%= mfp.datainfo[oidKey] %></strong></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+    <% } else { %>
+        <div class="alert alert-light border text-muted small mb-0">
+            Nessun dato descrittivo disponibile in <code>datainfo</code> per questa stampante.
+        </div>
+    <% } %>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Seleziona le righe OID non ancora elaborate presenti nel pannello corrente
+    const rows = document.querySelectorAll('#info-pane-<%= mfp.serial %> .oid-row');
+
+    rows.forEach(async (row) => {
+        const oid = row.dataset.oid;
+        if (!oid) return;
+
+        try {
+            // Chiamata all'endpoint del server passando l'oidKey
+            const response = await fetch(`/oid/${encodeURIComponent(oid)}`);
+            
+            if (!response.ok) throw new Error('Network error');
+            
+            const data = await response.json();
+
+            // Aggiornamento dei nodi DOM con la risposta del server
+            row.querySelector('.oid-short').textContent = data.short || '-';
+            row.querySelector('.oid-brand').textContent = data.brandShort || '-';
+            row.querySelector('.oid-desc').textContent = data.descrizione || '-';
+
+        } catch (error) {
+            // Fallback in caso di errore di connessione o rotta non trovata
+            row.querySelector('.oid-short').textContent = 'N/D';
+            row.querySelector('.oid-brand').textContent = 'N/D';
+            row.querySelector('.oid-desc').textContent = 'N/D';
+        }
+    });
+});
+</script>

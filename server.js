@@ -9,7 +9,26 @@ const crypto = require('crypto');
 
 const app = express();
 const server = express();
-const prisma = new PrismaClient();
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+//const PrismaBetterSqlite = require('@prisma/adapter-better-sqlite3');
+
+const Database = require('better-sqlite3');
+
+// Apre la connessione al file SQLite
+const sqlite = new Database('./prisma/dev.db');
+
+console.log(sqlite);
+const adapter = new PrismaBetterSqlite3({
+    sqlite,
+    url: 'file:./prisma/dev.db'
+});
+
+// Passa l'adapter al costruttore di PrismaClient
+const prisma = new PrismaClient({ adapter });
+
+module.exports = prisma;
+
+
 
 // se ci sono problemi usa npx prisma db pull;npx prisma generate
 
@@ -59,7 +78,7 @@ app.get('/', async (req, res) => {
     try {
         const mfpList = await prisma.hosts.findMany({
             include: {
-                listaDati: true, // Esegue la JOIN sulla colonna token
+                dati: true, // Esegue la JOIN sulla colonna token
             },
         });
 
@@ -68,13 +87,13 @@ app.get('/', async (req, res) => {
                 r["IPV4"] = JSON.parse(r["IPV4"]);
             if (r["crawler"])
                 r["crawler"] = JSON.parse(r["crawler"]);
-            for (const ld of r.listaDati) {
+            for (const ld of r.dati) {
                 if (ld["dataalerts"])
-                    ld["dataalerts"] = JSON.parse(ld["dataalerts"]);
+                    ld["dataalerts"] = JSON.parse(Buffer.from(ld["dataalerts"]).toString('utf-8'));//ld["dataalerts"]);
                 if (ld["datainfo"])
-                    ld["datainfo"] = JSON.parse(ld["datainfo"]);
+                    ld["datainfo"] = JSON.parse(Buffer.from(ld["datainfo"]).toString('utf-8'));
                 if (ld["dataconsumabili"])
-                    ld["dataconsumabili"] = JSON.parse(ld["dataconsumabili"]);
+                    ld["dataconsumabili"] = JSON.parse(Buffer.from(ld["dataconsumabili"]).toString('utf-8'));
             }
         }
         console.log('data:', JSON.stringify(mfpList));
@@ -152,12 +171,19 @@ server.post('/mfp', async (req, res) => {
             res.status(500).send("Errore token");
             return;
         }
+
+        if (token == "PLEASE") {
+            res.status(401).send("WRONG token");
+            return;
+        }
         const map = req.body;
-        const ipv4 = map["ipv4"];
-        const jsonString = JSON.stringify(map.maintenace);
+        //    const ipv4 = map["ipv4"];
+        const jsonStringConsumabili = JSON.stringify(map.maintenace);
+        const jsonStringAlerts = JSON.stringify(map.alerts);
 
         // Conversione in Base64
-        const dataconsumabili = Buffer.from(jsonString, 'utf-8').toString('base64');
+        const dataconsumabili = Buffer.from(jsonStringConsumabili, 'utf-8').toString('base64');
+        const dataalerts = Buffer.from(jsonStringAlerts, 'utf-8').toString('base64');
         const nuovoToken = await prisma.dati.upsert({
             where: {
                 serial: serial
@@ -166,20 +192,22 @@ server.post('/mfp', async (req, res) => {
                 token: token,
                 datainfo: JSON.stringify(map.info),
                 dataconsumabili: dataconsumabili,
-                dataalerts: JSON.stringify(map.alerts),
-                ipv4: ipv4
+                dataalerts: dataalerts,
+                //   ipv4: ipv4
             },
             create: {
                 serial: serial,
                 token: token,
                 datainfo: JSON.stringify(map.info),
                 dataconsumabili: dataconsumabili,
-                dataalerts: JSON.stringify(map.alerts),
-                ipv4: ipv4
+                dataalerts: dataalerts,
+                //   ipv4: ipv4
             },
         });
 
         console.log('Aggiornato con successo:[' + token + "]");
+        nuovoToken["dataalerts"] = Buffer.from(nuovoToken["dataalerts"]).toString('utf-8');
+        nuovoToken["dataconsumabili"] = Buffer.from(nuovoToken["dataconsumabili"]).toString('utf-8');
         //res.headers["token"] = nuovoToken["token"]
         res.send(nuovoToken);
 
@@ -203,34 +231,54 @@ server.post('/options', async (req, res) => {
             res.status(500).send("Errore token");
             return;
         }
+        const localData = req.body["localData"];
+        delete req.body["localData"];
+
+        const ldo = JSON.parse(localData);
+
+
+       
         if (token == "PLEASE") {
 
             //const payloadBase64 = Buffer.from(req.headers["hostname"]).toString('base64url');
-            const localData = req.body["localData"];
-            req.body["token"] = crypto.randomBytes(32).toString('hex');
-            delete req.body["localData"];
+
+
+
+
+            req.body["hostToken"] = crypto.randomBytes(32).toString('hex');
+            const optionsBuffer = Buffer.from(JSON.stringify(req.body), 'utf-8');
+
             const nuovoToken = await prisma.hosts.create({
                 data: {
-                    token: req.body["token"],
-                    options: JSON.stringify(req.body),
+                    hostname: ldo[0]["localHostName"],
+                    token: req.body["hostToken"],
+                    "customerID": req.body["customerToken"],
+                    options: optionsBuffer,
                     "IPV4": localData
                 },
             });
-
-            console.log('Riga inserita con successo:', nuovoToken);
+            nuovoToken["options"] = Buffer.from(nuovoToken["options"]).toString('utf-8');
+            nuovoToken["hostToken"] = nuovoToken["token"];
+            delete nuovoToken["token"];
+            console.log('Riga inserita con successo:'+nuovoToken["hostToken"]+"\n", nuovoToken);
             //res.headers["token"] = nuovoToken["token"]
             res.send(nuovoToken);
         } else {
-            const localData = req.body["localData"];
-            delete req.body["localData"];
+
+
+            const optionsBuffer = Buffer.from(JSON.stringify(req.body), 'utf-8');
             const nuovoToken = await prisma.hosts.update({
                 where: {
                     token: token
                 },
                 data: {
-                    options: JSON.stringify(req.body)
+                    hostname: ldo[0]["localHostName"],
+                    options: optionsBuffer
                 },
             });
+            nuovoToken["options"] = Buffer.from(nuovoToken["options"]).toString('utf-8');
+            nuovoToken["hostToken"] = nuovoToken["token"];
+            delete nuovoToken["token"];
             console.log('Aggiornato con successo:[' + token + "]", nuovoToken);
             //res.headers["token"] = nuovoToken["token"]
             res.send(nuovoToken);
@@ -248,7 +296,7 @@ server.get('/options', async (req, res) => {
     try {
         const token = req.headers["token"];
         if (token == null) {
-            res.status(500).send("Errore token");
+            res.status(401).send("Errore token");
             return;
         }
 
@@ -261,6 +309,8 @@ server.get('/options', async (req, res) => {
                 // Tutti gli altri campi del modello verranno esclusi dalla risposta
             },
         });
+        nuovoToken["options"] = Buffer.from(nuovoToken["options"]).toString('utf-8');
+
         console.log('   repurato con successo:[' + token + "]", nuovoToken);
         //res.headers["token"] = nuovoToken["token"]
         res.send(nuovoToken);
