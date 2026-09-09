@@ -128,7 +128,8 @@ app.post('/api/crawler/actions', async (req, res) => {
     try {
         const actions = await prisma.hosts.findUnique({
             where: {
-                token: token
+                token: token,
+                "customerID": req.headers["customertoken"]
             }, select: {
                 crawler: true
             },
@@ -178,22 +179,22 @@ server.post('/mfp', async (req, res) => {
             return;
         }
         const map = req.body;
-        const nuovoTokenB = await prisma.customers.update({
+        const checkCustomer = await prisma.customers.findUnique({
             where: {
                 "tokenI": req.headers["customertoken"],
             },
-            data: {
-
-                "lastUpdates": JSON.stringify(map.lastUpdates),
-                //   ipv4: ipv4
+            select: {
+                tokenI: true,
             },
-
         });
-        if (nuovoTokenB == null) {
+
+        if (!checkCustomer) {
             console.error('Invalid customerToken:' + req.headers["customertoken"]);
             res.status(401).send("Invalid customerToken:" + req.headers["customertoken"]);
             return;
         }
+
+        
         //    const ipv4 = map["ipv4"];
         const jsonStringConsumabili = JSON.stringify(map.maintenace);
         const jsonStringAlerts = JSON.stringify(map.alerts);
@@ -201,6 +202,8 @@ server.post('/mfp', async (req, res) => {
         // Conversione in Base64
         const dataconsumabili = Buffer.from(jsonStringConsumabili, 'utf-8').toString('base64');
         const dataalerts = Buffer.from(jsonStringAlerts, 'utf-8').toString('base64');
+
+        const customer = req.headers["customertoken"];
         const nuovoToken = await prisma.dati.upsert({
             where: {
                 serial: serial,
@@ -210,14 +213,14 @@ server.post('/mfp', async (req, res) => {
                 datainfo: JSON.stringify(map.info),
                 dataconsumabili: dataconsumabili,
                 dataalerts: dataalerts,
-                token: token,
+                token: customer,
                 datainfo: JSON.stringify(map.info),
                 "lastUpdates": JSON.stringify(map.lastUpdates),
                 //   ipv4: ipv4
             },
             create: {
                 serial: serial,
-                token: token,
+                token: customer,
                 datainfo: JSON.stringify(map.info),
                 dataconsumabili: dataconsumabili,
                 dataalerts: dataalerts,

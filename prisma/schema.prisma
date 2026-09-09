@@ -21,7 +21,7 @@ model dati {
   token           String
   data            Bytes?
   lastUpdates     String?
-  hosts           hosts   @relation(fields: [token], references: [token])
+  customer        customers   @relation(fields: [token], references: [tokenI])
 }
 
 model hosts {
@@ -31,7 +31,6 @@ model hosts {
   IPV4       String?
   crawler    String?
   customerID String
-  dati       dati[]
 }
 
 model oids {
@@ -49,4 +48,5 @@ model customers {
   tokenI      String  @id
   name        String  @default("new-entry?")
   lastUpdates String?
+  dati        dati[]
 }
