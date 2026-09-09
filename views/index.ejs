@@ -85,31 +85,17 @@
                 <label for="auto-refresh-select" class="form-label mb-0 small fw-bold">Auto-Refresh:</label>
                 <select id="auto-refresh-select" class="form-select form-select-sm" style="width: auto;">
                     <option value="0">Disattivato</option>
-                    <option value="1">Ogni secondo</option>
+                    <option value="1" selected>Ogni secondo</option>
                     <option value="10">Ogni 10 secondi</option>
-                    <option value="30" selected>Ogni 30 secondi</option>
+                    <option value="30" >Ogni 30 secondi</option>
                     <option value="60">Ogni 1 minuto</option>
                     <option value="300">Ogni 5 minuti</option>
                 </select>
             </div>
         </div>
 
-        <!-- TAB NAVIGATION -->
-        <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="customers-tab" data-bs-toggle="tab" data-bs-target="#customers-content" type="button" role="tab" aria-controls="customers-content" aria-selected="true">
-                    <i class="bi bi-people-fill"></i> Clienti
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="hosts-tab" data-bs-toggle="tab" data-bs-target="#hosts-content" type="button" role="tab" aria-controls="hosts-content" aria-selected="false">
-                    <i class="bi bi-server"></i> Host
-                </button>
-            </li>
-        </ul>
-
-        <!-- TAB CONTENTS -->
-        <div class="tab-content" id="mainTabContent">
+       
+      
             
             <!-- TAB 1: CUSTOMERS WITH THEIR HOSTS & DATI -->
             <div class="tab-pane fade show active" id="customers-content" role="tabpanel" aria-labelledby="customers-tab">
@@ -194,59 +180,7 @@
                     <% }); %>
                 <% } %>
             </div>
-
-            <!-- TAB 2: ALL HOSTS -->
-            <div class="tab-pane fade" id="hosts-content" role="tabpanel" aria-labelledby="hosts-tab">
-                <% if (!hosts || hosts.length===0) { %>
-                    <div class="alert alert-warning">Nessun host trovato nel sistema.</div>
-                <% } else { %>
-                    <% hosts.forEach((host)=> { %>
-                        <div class="card mb-4 shadow-sm border-0">
-
-                            <!-- HEADER HOST -->
-                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
-                                <div>
-                                    <h4 class="mb-0 text-warning">
-                                        <i class="bi bi-server"></i>
-                                        <%= host.hostname || 'Host Sconosciuto' %>
-                                    </h4>
-                                    <small class="text-white-50">
-                                        <% try { const ipv4 = JSON.parse(host.IPV4); %>
-                                            IP: <code><%= ipv4[0] ? ipv4[0].localIPv4 : 'N/D' %></code>
-                                            <%= (ipv4 && ipv4[0].localIF) ? `(${ipv4[0].localIF})` : '' %>
-                                        <% } catch(e) { %>
-                                            IP: N/D
-                                        <% } %>
-                                    </small>
-                                </div>
-                                <div>
-                                    <span class="badge bg-secondary token-truncate d-inline-block" title="<%= host.token %>">
-                                        Token: <%= host.token %>
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="card-body">
-                                <!-- CONTROLLI CRAWLER -->
-                                <%- include('partials/crawler-controls', { host: host }) %>
-
-                                <!-- LISTA STAMPANTE MFP PER HOST -->
-                                <h5 class="mt-4 mb-3"><i class="bi bi-printer-fill"></i> Stampanti Interrogate (<%=
-                                        host.dati ? host.dati.length : 0 %>)</h5>
-
-                                <% if (!host.dati || host.dati.length===0) { %>
-                                    <div class="alert alert-info mb-0">Nessuna MFP registrata o dati non ancora acquisiti per questo host.</div>
-                                <% } else { %>
-                                    <% host.dati.forEach((mfp)=> { %>
-                                        <%- include('partials/mfp-card', { mfp: mfp, host: host }) %>
-                                    <% }); %>
-                                <% } %>
-                            </div>
-                        </div>
-                    <% }); %>
-                <% } %>
-            </div>
-
+        
         </div>
     </div>
 

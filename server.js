@@ -72,13 +72,41 @@ app.get('/oid/:oid', async (req, res) => {
     }
 });
 
+const lastUpdates = [];
+// 0 REFRESH VARI
+app.post('/refresh', async (req, res) => {
+    try {
+        // Fetch all hosts
+        const dati = await prisma.dati.findMany({
+            include: {
+
+            },
+        });
+        const toRefresh = [];
+        for (const d of dati) {
+            const serial = d.serial;
+            if (!lastUpdates[serial] || (lastUpdates[serial].lastUpdates != d.lastUpdates)) {
+                lastUpdates[serial] = d;
+                toRefresh.push(d);
+
+            }
+        }
+        console.log('ref:', toRefresh);
+        res.send(toRefresh);
+    } catch (error) {
+
+        console.log('Errore:', error);
+        res.status(500).send("Errore nel caricamento della pagina:" + error);
+    }
+});
+
 // 1. ROTTA PAGINA INIZIALE
 app.get('/', async (req, res) => {
     try {
         // Fetch all hosts
         const hostsList = await prisma.hosts.findMany({
             include: {
-              
+
             },
         });
 
@@ -225,7 +253,7 @@ server.post('/mfp', async (req, res) => {
             return;
         }
 
-        
+
         //    const ipv4 = map["ipv4"];
         const jsonStringConsumabili = JSON.stringify(map.maintenace);
         const jsonStringAlerts = JSON.stringify(map.alerts);

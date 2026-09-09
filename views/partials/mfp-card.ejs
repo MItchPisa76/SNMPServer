@@ -48,23 +48,7 @@ const isOnline = statoOnline.startsWith('ONLINE');
                 <%- include('mfp-tab-status', { mfp: mfp }) %>
                 <%- include('mfp-tab-info', { mfp: mfp }) %>
                 
-                <!-- Tab Query OIDs -->
-                <div class="tab-pane fade" id="queryoids-pane-<%= mfp.serial %>" role="tabpanel">
-                    <div class="bg-light p-3 rounded border">
-                        <h6 class="fw-bold mb-2"><i class="bi bi-terminal"></i> Invia Query OID personalizzata a questa MFP</h6>
-                        <form class="queryoids-form row g-2 align-items-center" data-token="<%= host.token %>" data-ipv4="<%= mfp.ipv4 %>" data-serial="<%= mfp.serial %>">
-                            <div class="col-md-9 col-lg-10">
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text bg-white text-muted">OID</span>
-                                    <input type="text" class="form-control queryoids-input" placeholder="Es. 1.3.6.1.2.1.1.1.0, 1.3.6.1.2.1.1.5.0" value="<%= (host.crawler && host.crawler.queryoids) ? host.crawler.queryoids : '' %>">
-                                </div>
-                            </div>
-                            <div class="col-md-3 col-lg-2">
-                                <button type="submit" class="btn btn-sm btn-primary w-100"><i class="bi bi-send"></i> Invia Query</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+               
             </div>
         </div>
     </div>
