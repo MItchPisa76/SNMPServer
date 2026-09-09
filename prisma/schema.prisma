@@ -31,6 +31,7 @@ model hosts {
   IPV4       String?
   crawler    String?
   customerID String
+  customer   customers   @relation(fields: [customerID], references: [tokenI])
 }
 
 model oids {
@@ -49,4 +50,5 @@ model customers {
   name        String  @default("new-entry?")
   lastUpdates String?
   dati        dati[]
+  hosts       hosts[]
 }
