@@ -142,7 +142,8 @@ app.post('/api/crawler/actions', async (req, res) => {
         }
         const newvalue = await prisma.hosts.update({
             where: {
-                token: token
+                token: token,
+                "customerID": req.headers["customertoken"],
             }, data: {
                 crawler: JSON.stringify(crawler)
             },
@@ -177,6 +178,22 @@ server.post('/mfp', async (req, res) => {
             return;
         }
         const map = req.body;
+        const nuovoTokenB = await prisma.customers.update({
+            where: {
+                "tokenI": req.headers["customertoken"],
+            },
+            data: {
+
+                "lastUpdates": JSON.stringify(map.lastUpdates),
+                //   ipv4: ipv4
+            },
+
+        });
+        if (nuovoTokenB == null) {
+            console.error('Invalid customerToken:' + req.headers["customertoken"]);
+            res.status(401).send("Invalid customerToken:" + req.headers["customertoken"]);
+            return;
+        }
         //    const ipv4 = map["ipv4"];
         const jsonStringConsumabili = JSON.stringify(map.maintenace);
         const jsonStringAlerts = JSON.stringify(map.alerts);
@@ -186,13 +203,16 @@ server.post('/mfp', async (req, res) => {
         const dataalerts = Buffer.from(jsonStringAlerts, 'utf-8').toString('base64');
         const nuovoToken = await prisma.dati.upsert({
             where: {
-                serial: serial
+                serial: serial,
+
             },
             update: {
-                token: token,
                 datainfo: JSON.stringify(map.info),
                 dataconsumabili: dataconsumabili,
                 dataalerts: dataalerts,
+                token: token,
+                datainfo: JSON.stringify(map.info),
+                "lastUpdates": JSON.stringify(map.lastUpdates),
                 //   ipv4: ipv4
             },
             create: {
@@ -201,10 +221,15 @@ server.post('/mfp', async (req, res) => {
                 datainfo: JSON.stringify(map.info),
                 dataconsumabili: dataconsumabili,
                 dataalerts: dataalerts,
-                //   ipv4: ipv4
+                "lastUpdates": JSON.stringify(map.lastUpdates),
             },
         });
 
+        if (nuovoToken == null) {
+            console.log('Invalid token:' + token);
+            res.status(401).send("Invalid token:" + token);
+            return;
+        }
         console.log('Aggiornato con successo:[' + token + "]");
         nuovoToken["dataalerts"] = Buffer.from(nuovoToken["dataalerts"]).toString('utf-8');
         nuovoToken["dataconsumabili"] = Buffer.from(nuovoToken["dataconsumabili"]).toString('utf-8');
@@ -237,7 +262,7 @@ server.post('/options', async (req, res) => {
         const ldo = JSON.parse(localData);
 
 
-       
+
         if (token == "PLEASE") {
 
             //const payloadBase64 = Buffer.from(req.headers["hostname"]).toString('base64url');
@@ -252,15 +277,41 @@ server.post('/options', async (req, res) => {
                 data: {
                     hostname: ldo[0]["localHostName"],
                     token: req.body["hostToken"],
-                    "customerID": req.body["customerToken"],
+                    "customerID": req.headers["customertoken"],
                     options: optionsBuffer,
                     "IPV4": localData
                 },
             });
+
+
+            const customerData = await prisma.customers.upsert({
+                where: {
+                    "tokenI": req.headers["customertoken"],
+                },
+                update: {
+
+                },
+                create: {
+                    "tokenI": req.headers["customertoken"],
+                    "name": "APPENA_CREATO"
+                },
+            });
+
+            if (customerData["name"] == "APPENA_CREATO") {
+                const customerData = await prisma.customers.update({
+                    where: {
+                        "tokenI": req.headers["customertoken"],
+                    },
+                    data: {
+                        "name": "APPENA_CREATO_1"
+                    },
+
+                });
+            }
             nuovoToken["options"] = Buffer.from(nuovoToken["options"]).toString('utf-8');
             nuovoToken["hostToken"] = nuovoToken["token"];
             delete nuovoToken["token"];
-            console.log('Riga inserita con successo:'+nuovoToken["hostToken"]+"\n", nuovoToken);
+            console.log('Riga inserita con successo:' + nuovoToken["hostToken"] + "\n", nuovoToken);
             //res.headers["token"] = nuovoToken["token"]
             res.send(nuovoToken);
         } else {
@@ -269,13 +320,19 @@ server.post('/options', async (req, res) => {
             const optionsBuffer = Buffer.from(JSON.stringify(req.body), 'utf-8');
             const nuovoToken = await prisma.hosts.update({
                 where: {
-                    token: token
+                    token: token,
+                    "customerID": req.headers["customertoken"]
                 },
                 data: {
                     hostname: ldo[0]["localHostName"],
                     options: optionsBuffer
                 },
             });
+            if (nuovoToken == null) {
+                console.log('Invalid token:' + token);
+                res.status(401).send("Invalid token:" + token);
+                return;
+            }
             nuovoToken["options"] = Buffer.from(nuovoToken["options"]).toString('utf-8');
             nuovoToken["hostToken"] = nuovoToken["token"];
             delete nuovoToken["token"];
@@ -302,13 +359,19 @@ server.get('/options', async (req, res) => {
 
         const nuovoToken = await prisma.hosts.findUnique({
             where: {
-                token: token
+                token: token,
+                "customerID": req.headers["customertoken"]
             }, select: {
                 options: true,
                 crawler: true
                 // Tutti gli altri campi del modello verranno esclusi dalla risposta
             },
         });
+        if (nuovoToken == null) {
+            console.log('Invalid token:' + token);
+            res.status(401).send("Invalid token:" + token);
+            return;
+        }
         nuovoToken["options"] = Buffer.from(nuovoToken["options"]).toString('utf-8');
 
         console.log('   repurato con successo:[' + token + "]", nuovoToken);
@@ -334,7 +397,8 @@ server.get('/hello', async (req, res) => {
 
         const nuovoToken = await prisma.hosts.findUnique({
             where: {
-                token: token
+                token: token,
+                "customerID": req.headers["customertoken"]
             }, select: {
                 crawler: true
             },
