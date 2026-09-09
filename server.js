@@ -35,7 +35,6 @@ module.exports = prisma;
 
 
 
-
 const PORT = 3080; // Rimaniamo sulla porta scelta prima o usa 3443 se preferisci
 
 // Carica i certificati SSL dal disco
@@ -76,28 +75,59 @@ app.get('/oid/:oid', async (req, res) => {
 // 1. ROTTA PAGINA INIZIALE
 app.get('/', async (req, res) => {
     try {
-        const mfpList = await prisma.hosts.findMany({
+        // Fetch all hosts
+        const hostsList = await prisma.hosts.findMany({
             include: {
-                dati: true, // Esegue la JOIN sulla colonna token
+                dati: true,
             },
         });
 
-        for (const r of mfpList) {
+        // Fetch all customers with their hosts and dati
+        const customers = await prisma.customers.findMany({
+            include: {
+                dati: true,
+                hosts: true,
+            },
+        });
+
+        // Parse JSON fields for hosts
+        for (const r of hostsList) {
             if (r["IPV4"])
                 r["IPV4"] = JSON.parse(r["IPV4"]);
             if (r["crawler"])
                 r["crawler"] = JSON.parse(r["crawler"]);
             for (const ld of r.dati) {
                 if (ld["dataalerts"])
-                    ld["dataalerts"] = JSON.parse(Buffer.from(ld["dataalerts"]).toString('utf-8'));//ld["dataalerts"]);
+                    ld["dataalerts"] = JSON.parse(Buffer.from(ld["dataalerts"]).toString('utf-8'));
                 if (ld["datainfo"])
                     ld["datainfo"] = JSON.parse(Buffer.from(ld["datainfo"]).toString('utf-8'));
                 if (ld["dataconsumabili"])
                     ld["dataconsumabili"] = JSON.parse(Buffer.from(ld["dataconsumabili"]).toString('utf-8'));
             }
         }
-        console.log('data:', JSON.stringify(mfpList));
-        res.render('index', { hosts: mfpList });
+
+        // Parse JSON fields for customers and their hosts
+        for (const customer of customers) {
+            // Parse customer's dati
+            for (const ld of customer.dati) {
+                if (ld["dataalerts"])
+                    ld["dataalerts"] = JSON.parse(Buffer.from(ld["dataalerts"]).toString('utf-8'));
+                if (ld["datainfo"])
+                    ld["datainfo"] = JSON.parse(Buffer.from(ld["datainfo"]).toString('utf-8'));
+                if (ld["dataconsumabili"])
+                    ld["dataconsumabili"] = JSON.parse(Buffer.from(ld["dataconsumabili"]).toString('utf-8'));
+            }
+            // Parse customer's hosts
+            for (const host of customer.hosts) {
+                if (host["IPV4"])
+                    host["IPV4"] = JSON.parse(host["IPV4"]);
+                if (host["crawler"])
+                    host["crawler"] = JSON.parse(host["crawler"]);
+            }
+        }
+
+        console.log('data:', JSON.stringify(customers));
+        res.render('index', { hosts: hostsList, customers: customers });
     } catch (error) {
 
         console.log('Errore:', error);
@@ -158,7 +188,6 @@ app.post('/api/crawler/actions', async (req, res) => {
 server.set('json', path.join(__dirname, 'json'));
 server.use(express.json());
 server.use(express.static(path.join(__dirname, 'json')));
-
 
 
 
@@ -246,7 +275,6 @@ server.post('/mfp', async (req, res) => {
         res.status(500).send(error);
     }
 });
-
 
 
 
