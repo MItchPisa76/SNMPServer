@@ -78,7 +78,7 @@ app.get('/', async (req, res) => {
         // Fetch all hosts
         const hostsList = await prisma.hosts.findMany({
             include: {
-                dati: true,
+              
             },
         });
 
@@ -96,6 +96,7 @@ app.get('/', async (req, res) => {
                 r["IPV4"] = JSON.parse(r["IPV4"]);
             if (r["crawler"])
                 r["crawler"] = JSON.parse(r["crawler"]);
+            /*
             for (const ld of r.dati) {
                 if (ld["dataalerts"])
                     ld["dataalerts"] = JSON.parse(Buffer.from(ld["dataalerts"]).toString('utf-8'));
@@ -104,6 +105,7 @@ app.get('/', async (req, res) => {
                 if (ld["dataconsumabili"])
                     ld["dataconsumabili"] = JSON.parse(Buffer.from(ld["dataconsumabili"]).toString('utf-8'));
             }
+                */
         }
 
         // Parse JSON fields for customers and their hosts
