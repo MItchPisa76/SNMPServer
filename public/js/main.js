@@ -18,6 +18,53 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshBtn.addEventListener('click', () => location.reload());
     }
 
+
+    async function updateRefreshAlerts(serial) {
+        const container = document.getElementById(`alerts-container-${serial}`);
+        if (!container) return;
+
+        try {
+            // Effettua la chiamata alla rotta partial
+            const response = await fetch(`/api/mfp/${serial}/alerts`);
+
+            if (!response.ok) {
+                throw new Error(`Errore HTTP: ${response.status}`);
+            }
+
+            // Ottiene l'HTML parziale restituito dal server
+            const updatedHtml = await response.text();
+
+            // Inietta l'HTML aggiornato direttamente nel DOM senza refresh
+            container.innerHTML = updatedHtml;
+
+        } catch (error) {
+            console.error(`Errore durante il refresh dell'mfp alert ${serial}:`, error);
+        }
+    }
+
+    async function updateRefreshMantained(serial) {
+        const container = document.getElementById(`maintenance-container-${serial}`);
+        if (!container) return;
+
+        try {
+            // Effettua la chiamata alla rotta partial
+            const response = await fetch(`/api/mfp/${serial}/maintenance`);
+
+            if (!response.ok) {
+                throw new Error(`Errore HTTP: ${response.status}`);
+            }
+
+            // Ottiene l'HTML parziale restituito dal server
+            const updatedHtml = await response.text();
+
+            // Inietta l'HTML aggiornato direttamente nel DOM senza refresh
+            container.innerHTML = updatedHtml;
+
+        } catch (error) {
+            console.error(`Errore durante il refresh dell'mfp alert ${serial}:`, error);
+        }
+    }
+
     // Gestione timer auto-refresh
     function startAutoRefresh(seconds) {
         if (refreshTimer) clearInterval(refreshTimer);
@@ -32,8 +79,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     //console.log(await res.body);
                     const content = await res.json();
+                    for (const c of content) {
+                        if (c["crawler"]) {
+                            updateRefreshControls(c["token"]);
+                            console.log("CRAWLER",c);
+                        }
+                        if (c["lastUpdatedAlerts"]) {
+                            updateRefreshAlerts(c["serial"]);
+                            console.log("ALERT",c);
+                        }
 
-                    console.log(content);
+                        if (c["lastUpdatedMantained"]) {
+                            updateRefreshMantained(c["serial"]);
+                            console.log("ALERT",c);
+                        }
+                        
+                    }
+
                 }
                 //  location.reload();
             }, seconds * 1000);
@@ -77,34 +139,88 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // ==========================================
-    // 3. AZIONI PULSANTI CRAWLER (API POST)
-    // ==========================================
-    document.querySelectorAll('.crawler-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const token = e.target.dataset.token;
-            const action = e.target.dataset.action;
-            const value = e.target.dataset.value;
 
-            try {
-                const res = await fetch('/api/crawler/actions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token, action, value })
-                });
-                if (res.ok) {
-                    location.reload();
-                } else {
-                    alert('Errore durante l\'aggiornamento dell\'azione.');
-                }
-            } catch (err) {
-                console.error('Errore chiamata API:', err);
-            }
+
+
+    function updateButtonStyles(allButtons, clickedButton, value) {
+        allButtons.forEach(b => {
+            b.classList.remove('active', 'btn-success', 'btn-secondary', 'btn-info', 'text-white');
+            b.classList.add('btn-outline-secondary');
         });
+
+        clickedButton.classList.remove('btn-outline-secondary');
+        clickedButton.classList.add('active');
+
+        if (value === 'true') clickedButton.classList.add('btn-success');
+        else if (value === 'false') clickedButton.classList.add('btn-secondary');
+        else if (value === 'once') clickedButton.classList.add('btn-info', 'text-white');
+    }
+
+
+    async function updateRefreshControlsEvent(event) {
+        const btn = event.currentTarget;
+        const token = btn.dataset.token;
+        const action = btn.dataset.action;
+        const value = btn.dataset.value;
+
+        if (btn.classList.contains('active')) return;
+
+        const btnGroup = btn.closest('.btn-group');
+        const siblingButtons = btnGroup.querySelectorAll('.crawler-btn');
+
+        try {
+            const response = await fetch('/api/crawler/actions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, action, value })
+            });
+
+            if (!response.ok) throw new Error(`Errore risposta server: ${response.status}`);
+
+            siblingButtons.forEach(b => b.classList.add('disabled'));
+
+            updateButtonStyles(siblingButtons, btn, value);
+        } catch (error) {
+            console.error('Errore nell\'aggiornamento del parametro crawler:', error);
+            alert('Impossibile aggiornare lo stato del crawler.');
+        } finally {
+            siblingButtons.forEach(b => b.classList.remove('disabled'));
+        }
+    }
+
+    async function updateRefreshControls(hostToken) {
+        const container = document.getElementById(`crawler-controls-${hostToken}`);
+        if (!container) return;
+
+        try {
+            // Effettua la chiamata alla rotta partial
+            const response = await fetch(`/api/hosts/${hostToken}/controls`);
+
+            if (!response.ok) {
+                throw new Error(`Errore HTTP: ${response.status}`);
+            }
+
+            // Ottiene l'HTML parziale restituito dal server
+            const updatedHtml = await response.text();
+
+            // Inietta l'HTML aggiornato direttamente nel DOM senza refresh
+            container.innerHTML = updatedHtml;
+            const crawlerButtons = container.querySelectorAll('.crawler-btn');
+
+            crawlerButtons.forEach(button => {
+                button.addEventListener('click', updateRefreshControlsEvent);
+            });
+        } catch (error) {
+            console.error(`Errore durante il refresh dell'host ${hostToken}:`, error);
+        }
+    }
+
+    const crawlerButtons = document.querySelectorAll('.crawler-btn');
+
+    crawlerButtons.forEach(button => {
+        button.addEventListener('click', updateRefreshControlsEvent);
     });
 });
-
-
 
 if (1 == 0)
     document.addEventListener('DOMContentLoaded', () => {
@@ -173,99 +289,58 @@ if (1 == 0)
         const crawlerButtons = document.querySelectorAll('.crawler-btn');
 
         crawlerButtons.forEach(button => {
-            button.addEventListener('click', async (event) => {
-                const btn = event.currentTarget;
-                const token = btn.dataset.token;
-                const action = btn.dataset.action;
-                const value = btn.dataset.value;
+            button.addEventListener('click', updateRefreshControls);
 
-                if (btn.classList.contains('active')) return;
 
-                const btnGroup = btn.closest('.btn-group');
-                const siblingButtons = btnGroup.querySelectorAll('.crawler-btn');
-                siblingButtons.forEach(b => b.classList.add('disabled'));
+            // ==========================================
+            // 2. GESTIONE FORM QUERY OIDs (PER SINGOLA MFP)
+            // ==========================================
+            const queryOidsForms = document.querySelectorAll('.queryoids-form');
 
-                try {
-                    const response = await fetch('/api/crawler/actions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token, action, value })
-                    });
+            queryOidsForms.forEach(form => {
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
 
-                    if (!response.ok) throw new Error(`Errore risposta server: ${response.status}`);
+                    const token = form.dataset.token;
+                    const serial = form.dataset.serial;
+                    const ipv4 = form.dataset.ipv4;
+                    const inputField = form.querySelector('.queryoids-input');
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    const queryoidsValue = inputField.value.trim();
 
-                    updateButtonStyles(siblingButtons, btn, value);
-                } catch (error) {
-                    console.error('Errore nell\'aggiornamento del parametro crawler:', error);
-                    alert('Impossibile aggiornare lo stato del crawler.');
-                } finally {
-                    siblingButtons.forEach(b => b.classList.remove('disabled'));
-                }
+                    if (!queryoidsValue) {
+                        alert('Inserisci almeno un OID prima di inviare.');
+                        return;
+                    }
+
+                    const originalBtnHTML = submitBtn.innerHTML;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Invio...';
+
+                    try {
+                        const response = await fetch('/api/crawler/actions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                token,
+                                serial,
+                                action: 'queryoids',
+                                value: queryoidsValue,
+                                ipv4
+                            })
+                        });
+
+                        if (!response.ok) throw new Error(`Errore Server: ${response.status}`);
+
+                    } catch (error) {
+                        console.error('Errore durante il salvataggio degli OID:', error);
+                        alert('Impossibile salvare il campo Query OIDs.');
+                    } finally {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnHTML;
+                    }
+                });
             });
-        });
 
-        function updateButtonStyles(allButtons, clickedButton, value) {
-            allButtons.forEach(b => {
-                b.classList.remove('active', 'btn-success', 'btn-secondary', 'btn-info', 'text-white');
-                b.classList.add('btn-outline-secondary');
-            });
-
-            clickedButton.classList.remove('btn-outline-secondary');
-            clickedButton.classList.add('active');
-
-            if (value === 'true') clickedButton.classList.add('btn-success');
-            else if (value === 'false') clickedButton.classList.add('btn-secondary');
-            else if (value === 'once') clickedButton.classList.add('btn-info', 'text-white');
-        }
-
-        // ==========================================
-        // 2. GESTIONE FORM QUERY OIDs (PER SINGOLA MFP)
-        // ==========================================
-        const queryOidsForms = document.querySelectorAll('.queryoids-form');
-
-        queryOidsForms.forEach(form => {
-            form.addEventListener('submit', async (event) => {
-                event.preventDefault();
-
-                const token = form.dataset.token;
-                const serial = form.dataset.serial;
-                const ipv4 = form.dataset.ipv4;
-                const inputField = form.querySelector('.queryoids-input');
-                const submitBtn = form.querySelector('button[type="submit"]');
-                const queryoidsValue = inputField.value.trim();
-
-                if (!queryoidsValue) {
-                    alert('Inserisci almeno un OID prima di inviare.');
-                    return;
-                }
-
-                const originalBtnHTML = submitBtn.innerHTML;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Invio...';
-
-                try {
-                    const response = await fetch('/api/crawler/actions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            token,
-                            serial,
-                            action: 'queryoids',
-                            value: queryoidsValue,
-                            ipv4
-                        })
-                    });
-
-                    if (!response.ok) throw new Error(`Errore Server: ${response.status}`);
-
-                } catch (error) {
-                    console.error('Errore durante il salvataggio degli OID:', error);
-                    alert('Impossibile salvare il campo Query OIDs.');
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalBtnHTML;
-                }
-            });
-        });
-
+        })
     });

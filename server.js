@@ -85,18 +85,134 @@ app.post('/refresh', async (req, res) => {
         const toRefresh = [];
         for (const d of dati) {
             const serial = d.serial;
-            if (!lastUpdates[serial] || (lastUpdates[serial].lastUpdates != d.lastUpdates)) {
-                lastUpdates[serial] = d;
-                toRefresh.push(d);
+            if (lastUpdates[serial]) {
 
+                const json = JSON.parse(d.lastUpdates);
+                if (json.lastUpdatedAlerts == lastUpdates[serial].lastUpdatedAlerts) {
+                    delete json["lastUpdatedAlerts"];
+                } else {
+                    console.log("NEW Alert");
+                }
+                if (json.lastUpdatedMantained == lastUpdates[serial].lastUpdatedMantained) {
+                    delete json.lastUpdatedMantained;
+                } else {
+                    console.log("NEW Maintain");
+                }
+                json["serial"] = serial;
+                toRefresh.push(json);
+            }
+            lastUpdates[serial] = JSON.parse(d.lastUpdates);
+        }
+        const updateHCW = await prisma.hosts.findMany({
+            select: {
+                token: true,
+                crawler: true
+            },
+        });
+
+
+
+        for (const h of updateHCW) {
+            const crawler = JSON.parse(h.crawler);
+
+            const token = h.token;
+            if ("" + crawler["updateRemote"] == "true") {
+                crawler["updateRemote"] = false;
+                toRefresh.push(h);
+                const updateHCW = await prisma.hosts.update({
+                    where: {
+                        token: h.token
+                    },
+                    data: {
+                        crawler: JSON.stringify(crawler)
+                    },
+                });
             }
         }
+
         console.log('ref:', toRefresh);
         res.send(toRefresh);
     } catch (error) {
 
         console.log('Errore:', error);
         res.status(500).send("Errore nel caricamento della pagina:" + error);
+    }
+});
+
+app.get('/api/mfp/:serial/maintenance', async (req, res) => {
+    try {
+        const serial = req.params.serial;
+        const maintainance = await prisma.dati.findUnique({
+            where: {
+                serial: serial,
+            }, select: {
+                serial: true,
+                dataconsumabili: true
+            }
+        });
+        if (!maintainance) {
+            return res.status(404).send('maintenance non trovato:' + serial);
+        }
+
+
+        // 2. Renderizza ed invia SOLO il partial EJS
+        //  alerts["dataalerts"] = JSON.parse(Buffer.from(alerts["dataalerts"]).toString('utf-8'));
+        maintainance["dataconsumabili"] = JSON.parse(Buffer.from(maintainance["dataconsumabili"]).toString('utf-8'));
+        res.render('partials/mfp-tab-status-maintenance.ejs', { mfp: maintainance });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Errore aggiornamento controlli');
+    }
+});
+
+
+
+app.get('/api/mfp/:serial/alerts', async (req, res) => {
+    try {
+        const serial = req.params.serial;
+        const alerts = await prisma.dati.findUnique({
+            where: {
+                serial: serial,
+            }, select: {
+                serial: true,
+                dataalerts: true
+            }
+        });
+        if (!alerts) {
+            return res.status(404).send('alerts non trovato:' + serial);
+        }
+
+        const str = JSON.stringify(alerts);
+        // 2. Renderizza ed invia SOLO il partial EJS
+        alerts["dataalerts"] = JSON.parse(Buffer.from(alerts["dataalerts"]).toString('utf-8'));
+        res.render('partials/mfp-tab-status-alerts.ejs', { mfp: alerts });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Errore aggiornamento controlli');
+    }
+});
+
+app.get('/api/hosts/:token/controls', async (req, res) => {
+    try {
+        const token = req.params.token;
+        const host = await prisma.hosts.findUnique({
+            where: {
+                token: token,
+            }, select: {
+                crawler: true,
+                token: true
+            },
+        });
+        if (!host) {
+            return res.status(404).send('Host non trovato:' + token);
+        }
+
+
+        // 2. Renderizza ed invia SOLO il partial EJS
+        res.render('partials/crawler-controls', { host: host });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Errore aggiornamento controlli');
     }
 });
 
@@ -223,11 +339,12 @@ server.use(express.static(path.join(__dirname, 'json')));
 
 
 server.post('/mfp', async (req, res) => {
-    console.log("MFP");
+
     try {
         const token = req.headers["token"];
         const serial = req.headers["serial"];
 
+        console.log("MFP:" + serial + ":" + token);
         if (token == null) {
             res.status(500).send("Errore token");
             return;

@@ -13,9 +13,11 @@
         if (normalized === 'once') return 'ONCE'; 
         return 'OFF'; 
     } 
+
+    
     %>
 
-    <div class="col-md-12 d-flex flex-wrap gap-3 align-items-center">
+    <div class="col-md-12 d-flex flex-wrap gap-3 align-items-center" >
         <!-- Find New Hosts -->
         <% let stFind = getStatus(host.crawler ? host.crawler.findNewHosts : null); %>
         <div class="d-flex align-items-center bg-white p-2 rounded border">

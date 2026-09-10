@@ -1,0 +1,35 @@
+<!-- Consumabili -->
+
+<h6 class="fw-bold">Consumabili e Componenti</h6>
+<% if (mfp.dataconsumabili) { %>
+    <% Object.keys(mfp.dataconsumabili).forEach(key=> {
+        const item = mfp.dataconsumabili[key];
+        const val = parseInt(item.value, 10) || 0;
+        const max = parseInt(item.max, 10) || 1;
+        const percent = Math.min(100, Math.round((val / max) * 100));
+
+        let barColor = 'bg-primary';
+        if (item.type === 'Toner') barColor = 'bg-dark';
+        if (percent > 85) barColor = 'bg-warning';
+        if (percent >= 95) barColor = 'bg-danger';
+        %>
+        <div class="mb-2">
+            <div class="d-flex justify-content-between small">
+                <span><strong>
+                        <%= item.name %>
+                    </strong> (<%= item.type %>)</span>
+                <span>
+                    <%= val %> / <%= max %>
+                            <%= item.unitsS1 || '' %> (<%= percent %>%)
+                </span>
+            </div>
+            <div class="progress progress-thin">
+                <div class="progress-bar <%= barColor %>" role="progressbar" style=`width: <%= percent %>%;`>
+                    <%= percent %>%
+                </div>
+            </div>
+        </div>
+        <% }); %>
+            <% } else { %>
+                <p class="text-muted small">Dati consumabili non disponibili.</p>
+                <% } %>

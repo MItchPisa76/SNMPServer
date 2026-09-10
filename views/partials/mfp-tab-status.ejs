@@ -1,59 +1,13 @@
 <div class="tab-pane fade show active" id="status-pane-<%= mfp.serial %>" role="tabpanel">
     <div class="row">
         <!-- Consumabili -->
-        <div class="col-lg-7 mb-3 mb-lg-0" id="consumabili-container-<%= mfp.serial %>">
-            <h6 class="fw-bold">Consumabili e Componenti</h6>
-            <% if (mfp.dataconsumabili) { %>
-                <% Object.keys(mfp.dataconsumabili).forEach(key => { 
-                    const item = mfp.dataconsumabili[key];
-                    const val = parseInt(item.value, 10) || 0;
-                    const max = parseInt(item.max, 10) || 1;
-                    const percent = Math.min(100, Math.round((val / max) * 100));
-
-                    let barColor = 'bg-primary';
-                    if (item.type === 'Toner') barColor = 'bg-dark';
-                    if (percent > 85) barColor = 'bg-warning';
-                    if (percent >= 95) barColor = 'bg-danger';
-                %>
-                    <div class="mb-2">
-                        <div class="d-flex justify-content-between small">
-                            <span><strong><%= item.name %></strong> (<%= item.type %>)</span>
-                            <span><%= val %> / <%= max %> <%= item.unitsS1 || '' %> (<%= percent %>%)</span>
-                        </div>
-                        <div class="progress progress-thin">
-                            <div class="progress-bar <%= barColor %>" role="progressbar" style="width: <%= percent %>%;">
-                                <%= percent %>%
-                            </div>
-                        </div>
-                    </div>
-                <% }); %>
-            <% } else { %>
-                <p class="text-muted small">Dati consumabili non disponibili.</p>
-            <% } %>
+        <div class="col-lg-7 mb-3 mb-lg-0" id="maintenance-container-<%= mfp.serial %>">
+            <%- include('mfp-tab-status-maintenance.ejs', { mfp: mfp }) %>
         </div>
 
         <!-- Alert -->
         <div class="col-lg-5" id="alerts-container-<%= mfp.serial %>">
-            <h6 class="fw-bold">Alert & Notifiche</h6>
-            <% let hasAlerts = false; 
-            if (mfp.dataalerts) {
-                Object.keys(mfp.dataalerts).forEach(aKey => {
-                    const alert = mfp.dataalerts[aKey];
-                    if (alert.description && alert.description.trim() !== '') {
-                        hasAlerts = true; %>
-                        <div class="alert alert-warning p-2 small mb-2">
-                            <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                            <strong>Livello <%= alert.severity %>:</strong> <%= alert.description %>
-                            <div class="text-muted mt-1" style="font-size: 10px;">Attivo da: <%= alert.time %></div>
-                        </div>
-                    <% } 
-                }); 
-            } 
-            if (!hasAlerts) { %>
-                <div class="alert alert-light border p-2 text-success small mb-0">
-                    <i class="bi bi-check-circle-fill"></i> Nessun alert attivo.
-                </div>
-            <% } %>
+            <%- include('mfp-tab-status-alerts.ejs', { mfp: mfp }) %>
         </div>
     </div>
 </div>
