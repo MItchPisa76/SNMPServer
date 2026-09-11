@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');    // <-- Nuovo: per leggere i file dei certificati
 const https = require('https'); // <-- Nuovo: per creare il server sicuro
 const { hostname } = require('os');
-
+const unzipper = require('unzipper');
 const crypto = require('crypto');
 
 const app = express();
@@ -424,7 +424,257 @@ server.post('/mfp', async (req, res) => {
 });
 
 
+// In server.js (usa 'app' invece di 'server' e correggi la chiamata GET a GitHub)
+app.get('/api/github/releases', async (req, res) => {
+    const owner = 'MitchPisa76';
+    const repo = 'MFPCrawler';
 
+    const options = {
+        hostname: 'api.github.com',
+        path: `/repos/${owner}/${repo}/releases`,
+        method: 'GET',
+        headers: {
+            'User-Agent': 'JNODE-MFPCrawler-Dashboard',
+            'Accept': 'application/vnd.github+json'
+            // Se la repo è privata:
+            // 'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`
+        }
+    };
+
+    const request = https.request(options, (githubRes) => {
+        let body = '';
+        githubRes.on('data', chunk => body += chunk);
+        githubRes.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                res.json(data);
+            } catch (err) {
+                res.status(500).json({ error: 'Errore nel parsing della risposta GitHub' });
+            }
+        });
+    });
+
+    request.on('error', (err) => {
+        res.status(500).json({ error: err.message });
+    });
+
+    request.end();
+});
+
+
+const GITHUB_TOKEN = "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"
+// 1. Trigger della Action via POST
+app.post('/api/github/trigger-build', async (req, res) => {
+    const { target_version, param_a, param_b } = req.body;
+    const owner = 'MItchPisa76';
+    const repo = 'MFPCrawler-distribution';
+    const workflowId = 'generate-custom-installer-remote.yml';
+
+    const ssl_cert = Buffer.from(sslOptions.cert).toString();
+
+    const data = JSON.stringify({
+        ref: 'main',
+        inputs: { target_version, param_a, param_b, ssl_cert }
+    });
+
+    const options = {
+        hostname: 'api.github.com',
+        path: `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
+        method: 'POST',
+        headers: {
+            'User-Agent': 'JNODE-MFPCrawler-Dashboard',
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GITHUB_TOKEN}`
+        }
+    };
+
+    const request = https.request(options, (githubRes) => {
+        if (githubRes.statusCode === 204) {
+            res.status(200).json({ success: true, timestamp: Date.now() });
+        } else {
+            console.log(githubRes);
+            res.status(githubRes.statusCode).json({ error: 'Errore invio a GitHub' });
+        }
+    });
+    request.write(data);
+    request.end();
+    request.on('error', (err) => {
+        console.log(err);
+        res.status(500).json({ error: err.message });
+    });
+
+});
+
+let loopOut = false;
+app.get('/api/github/build-status', async (req, res) => {
+    const owner = 'MItchPisa76';
+    const repo = 'MFPCrawler-distribution';
+
+    const options = {
+        hostname: 'api.github.com',
+        path: `/repos/${owner}/${repo}/actions/runs?per_page=1`,
+        method: 'GET',
+        headers: {
+            'User-Agent': 'JNODE-MFPCrawler-Dashboard',
+            'Accept': 'application/vnd.github+json',
+            'Authorization': `Bearer ${GITHUB_TOKEN}`
+        }
+    };
+
+    const request = https.request(options, (githubRes) => {
+        let body = '';
+        githubRes.on('data', chunk => body += chunk);
+        githubRes.on('end', async () => {
+            try {
+                const data = JSON.parse(body);
+
+                if (data.workflow_runs && data.workflow_runs.length > 0) {
+                    const run = data.workflow_runs[0];
+                    let fileSavedPath = null;
+
+                    // Se la build è completata con successo, scarichiamo e salviamo l'artifact in locale
+                    if (run.status === 'completed' && run.conclusion === 'success' && !loopOut) {
+                        try {
+                            loopOut = true;
+                            fileSavedPath = await downloadAndExtractArtifact(run.artifacts_url);
+                        } catch (saveErr) {
+                            
+                            console.error('Errore durante il salvataggio dell artifact:', saveErr.message);
+                        }
+                        loopOut = false;
+                    }
+
+                    // Risposta unica in formato JSON al client
+                    return res.json({
+                        status: run.status,
+                        conclusion: run.conclusion,
+                        html_url: run.html_url,
+                        savedLocally: !!fileSavedPath,
+                        savedPath: fileSavedPath
+                    });
+
+                } else {
+                    return res.status(404).json({ error: 'Nessuna run trovata' });
+                }
+            } catch (err) {
+                return res.status(500).json({ error: 'Errore parsing JSON: ' + err.message });
+            }
+        });
+    });
+
+    request.on('error', (err) => res.status(500).json({ error: err.message }));
+    request.end();
+});
+/**
+ * Recupera il JSON degli artifacts, estrae archive_download_url e salva il file estratto su disco
+ */
+function downloadAndExtractArtifact(artifactsUrl) {
+    return new Promise((resolve, reject) => {
+        const fetchOptions = {
+            headers: {
+                'User-Agent': 'JNODE-MFPCrawler-Dashboard',
+                'Authorization': `Bearer ${GITHUB_TOKEN}`
+            }
+        };
+
+        // Step 1: Richiesta GET a run.artifacts_url
+        https.get(artifactsUrl, fetchOptions, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+                try {
+                    const artifactsJson = JSON.parse(body);
+
+                    if (!artifactsJson.artifacts || artifactsJson.artifacts.length === 0) {
+                        return reject(new Error('Nessun artifact presente per questa run.'));
+                    }
+
+                    // Step 2: Estrazione della proprietà archive_download_url
+                    const zipDownloadUrl = artifactsJson.artifacts[0].archive_download_url;
+
+                    // Cartella di destinazione locale
+                    const outputDir = path.join(__dirname, 'downloads');
+                    if (!fs.existsSync(outputDir)) {
+                        fs.mkdirSync(outputDir, { recursive: true });
+                    }
+
+                    function streamHandler(zipStream) {
+                        // 1. Gestione del Redirect (301/302) da GitHub verso AWS S3
+                        if (zipStream.statusCode === 301 || zipStream.statusCode === 302) {
+                            const redirectUrl = zipStream.headers.location;
+
+                            // IMPORTANTE:
+                            // - Usiamo l'URL completo restituito dall'header location
+                            // - Inviamo l'User-Agent (richiesto da molte API)
+                            // - OMETTIAMO rigorosamente 'Authorization' perché AWS S3 la rifiuta se l'URL ha già i token di firma
+                            const redirectOptions = {
+                                headers: {
+                                    'User-Agent': 'JNODE-MFPCrawler-Dashboard'
+                                }
+                            };
+
+                            return https.get(redirectUrl, redirectOptions, streamHandler)
+                                .on('error', err => {
+                                    reject(err)
+                                });
+                        }
+
+                        // 2. Controllo che S3 abbia risposto 200 OK prima di passare lo stream ad unzipper
+                        if (zipStream.statusCode !== 200) {
+                            let errorBody = '';
+                            zipStream.on('data', chunk => errorBody += chunk);
+                            zipStream.on('end', () => {
+                                // Questo log ti mostrerà esattamente cosa risponde AWS S3 o GitHub se fallisce
+                                reject(new Error(`Download fallito con status HTTP ${zipStream.statusCode}: ${errorBody}`));
+                            });
+                            return;
+                        }
+
+                        // 3. Estrazione dello Zip se la risposta è valida (HTTP 200)
+                        let savedFilePath = null;
+                        const parser = unzipper.Parse();
+
+                        parser.on('entry', (entry) => {
+                            const fileName = path.basename(entry.path);
+
+                            if (entry.type === 'File' && !savedFilePath) {
+                                savedFilePath = path.join(outputDir, fileName);
+
+                                if (fs.existsSync(savedFilePath)) {
+                                    entry.autodrain();
+                                    return resolve(savedFilePath);
+                                }
+
+                                const writeStream = fs.createWriteStream(savedFilePath);
+                                entry.pipe(writeStream);
+
+                                writeStream.on('finish', () => resolve(savedFilePath));
+                                writeStream.on('error', err => reject(err));
+                            } else {
+                                entry.autodrain();
+                            }
+                        });
+
+                        parser.on('error', (err) => {
+                            reject(new Error('Errore durante il parsing del file ZIP: ' + err.message));
+                        });
+
+                        zipStream.pipe(parser);
+                    }
+
+                    https.get(zipDownloadUrl, fetchOptions, streamHandler)
+                        .on('error', (err) => {
+                            reject(err)
+                        });
+
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }).on('error', (err) => reject(err));
+    });
+}
 
 server.post('/options', async (req, res) => {
     console.log(req);
