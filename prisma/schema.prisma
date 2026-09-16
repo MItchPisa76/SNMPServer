@@ -13,7 +13,7 @@ model User {
 }
 
 model dati {
-  serial          String  @id
+  serial          String    @id
   datainfo        String?
   dataconsumabili Bytes?
   datacontatori   String?
@@ -21,17 +21,17 @@ model dati {
   token           String
   data            Bytes?
   lastUpdates     String?
-  customer        customers   @relation(fields: [token], references: [tokenI])
+  customer        customers @relation(fields: [token], references: [tokenI])
 }
 
 model hosts {
   hostname   String?
-  token      String  @unique(map: "sqlite_autoindex_hosts_1")
+  token      String    @unique(map: "sqlite_autoindex_hosts_1")
   options    Bytes?
   IPV4       String?
   crawler    String?
   customerID String
-  customer   customers   @relation(fields: [customerID], references: [tokenI])
+  customer   customers @relation(fields: [customerID], references: [tokenI])
 }
 
 model oids {
@@ -49,6 +49,7 @@ model customers {
   tokenI      String  @id
   name        String  @default("new-entry?")
   lastUpdates String?
+  builds      Bytes?
   dati        dati[]
   hosts       hosts[]
 }

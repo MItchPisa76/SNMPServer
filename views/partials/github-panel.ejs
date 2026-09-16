@@ -1,0 +1,39 @@
+<!-- BARRA GITHUB -->
+<div class="bg-white p-3 rounded shadow-sm border mb-4 github-panel-container" 
+     data-customer-name="<%= customer.name %>" 
+     data-customer-token="<%= customer.tokenI %>">
+    <div class="row g-3 align-items-center">
+        <div class="col-12 col-md-auto">
+            <span class="fw-bold text-dark d-flex align-items-center gap-2">
+                <i class="bi bi-github fs-5"></i> GitHub Release Build
+            </span>
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label small fw-bold mb-1">Versione:</label>
+            <select class="form-select form-select-sm github-release-select">
+                <option value="" disabled selected>Caricamento release...</option>
+            </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label small fw-bold mb-1">Token Extra:</label>
+            <input type="text" class="form-control form-control-sm github-token-input" placeholder="Token...">
+        </div>
+
+        <div class="col-12 col-md-auto ms-auto align-items-center gap-2">
+            <button class="btn btn-primary btn-sm d-flex align-items-center gap-2 mt-4 mt-sm-0 btn-trigger-github">
+                <i class="bi bi-rocket-takeoff-fill"></i> Avvia Build
+            </button>
+            <div class="github-build-status mt-4 mt-sm-0"></div>
+        </div>
+    </div>
+    
+    <!-- DIV DEDICATO PER VISUALIZZARE GLI ERRORI -->
+    <div class="mt-2 github-panel-error-container" style="display: none;">
+        <div class="alert alert-danger alert-dismissible fade show mb-0 p-2 small" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <span class="github-panel-error-text"></span>
+            <button type="button" class="btn-close p-2" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+</div>

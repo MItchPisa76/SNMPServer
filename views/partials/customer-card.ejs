@@ -1,0 +1,93 @@
+<div class="card mb-4 shadow-sm border-0 customer-card-root">
+    <!-- CUSTOMER HEADER -->
+    <div class="card-header bg-primary text-white d-flex flex-column gap-2 py-3">
+        <div class="d-flex justify-content-between align-items-center w-100">
+            <div>
+                <h4 class="mb-0">
+                    <i class="bi bi-person-badge-fill"></i>
+                    <%= customer.name %>
+                </h4>
+                <small class="text-white-50">
+                    Token: <code><%= customer.tokenI %></code>
+                </small>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <span class="badge bg-light text-primary">
+                    <%= customer.hosts ? customer.hosts.length : 0 %> Host
+                </span>
+                <span class="badge bg-light text-success">
+                    <%= customer.dati ? customer.dati.length : 0 %> MFP
+                </span>
+                <!-- GESTITO TOTALMENTE DA JAVASCRIPT -->
+                <button class="btn btn-sm btn-outline-light ms-2 btn-toggle-files" type="button">
+                    <i class="bi bi-folder-symlink-fill"></i> Files Generati
+                </button>
+            </div>
+        </div>
+
+        <!-- MODIFICATO: Rimosso ID, aggiunta classe identificativa per il collapse -->
+        <div class="collapse customer-files-collapse mt-2 text-dark">
+            <div class="card card-body bg-light border-0 text-start shadow-inner p-3">
+                <h6 class="border-bottom pb-2 mb-2 text-primary fw-bold">
+                    <!-- BARRA GITHUB -->
+                    <%- include('github-panel', { customer: customer }) %>
+                </h6>
+
+                <!-- TABELLA FILE SCARICATI (Senza ID) -->
+                <div class="customer-files-container">
+                    <%- include('customer-files-table', { customer: customer }) %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- HOSTS SECTION FOR THIS CUSTOMER -->
+        <div class="customer-section">
+            <h5 class="mb-3"><i class="bi bi-server"></i> Host Registrati</h5>
+            <% if (!customer.hosts || customer.hosts.length===0) { %>
+                <div class="alert alert-info mb-3">Nessun host registrato per questo cliente.</div>
+                <% } else { %>
+                    <% customer.hosts.forEach((host)=> { %>
+                        <div class="host-section p-3 rounded mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <h6 class="mb-0 text-dark">
+                                        <i class="bi bi-server"></i>
+                                        <%= host.hostname || 'Host Sconosciuto' %>
+                                    </h6>
+                                    <small class="text-muted">
+                                        <% try { const ipv4=JSON.parse(host.IPV4); %>
+                                            IP: <code><%= ipv4[0] ? ipv4[0].localIPv4 : 'N/D' %></code>
+                                            <%= (ipv4 && ipv4[0].localIF) ? `(${ipv4[0].localIF})` : '' %>
+                                                <% } catch(e) { %>
+                                                    IP: N/D
+                                                    <% } %>
+                                    </small>
+                                </div>
+                                <span class="badge bg-secondary token-truncate" title="<%= host.token %>">
+                                    <%= host.token %>
+                                </span>
+                            </div>
+                            <div id="crawler-controls-<%= host.token %>">
+                                <%- include('crawler-controls', { host: host }) %>
+                            </div>
+                        </div>
+                        <% }); %>
+                            <% } %>
+        </div>
+
+        <!-- DATI/MFP SECTION FOR THIS CUSTOMER -->
+        <div class="customer-section mt-4">
+            <h5 class="mb-3"><i class="bi bi-printer-fill"></i> Dispositivi MFP (<%= customer.dati ?
+                    customer.dati.length : 0 %>)</h5>
+            <% if (!customer.dati || customer.dati.length===0) { %>
+                <div class="alert alert-info mb-0">Nessun dispositivo MFP registrato per questo cliente.</div>
+                <% } else { %>
+                    <% customer.dati.forEach((mfp)=> { %>
+                        <%- include('mfp-card', { mfp: mfp, customer: customer }) %>
+                            <% }); %>
+                                <% } %>
+        </div>
+    </div>
+</div>
