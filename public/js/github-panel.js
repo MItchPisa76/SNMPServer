@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     githubPanels.forEach(panel => {
         // Riferimenti locali al singolo pannello cliente
         const versionSelect = panel.querySelector('.github-release-select');
+        const soSelect = panel.querySelector('.github-so-select');
         const tokenInput = panel.querySelector('.github-token-input');
         const btnTrigger = panel.querySelector('.btn-trigger-github');
         const statusSpan = panel.querySelector('.github-build-status');
@@ -72,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const res = await fetch('/api/github/build-status/' + customerToken + "/" + version, {
                         headers: {
                             'Content-Type': 'application/json',
-
                         },
                     });
                     if (res.status != 200) {
@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnTrigger) {
             btnTrigger.addEventListener('click', async () => {
                 clearError();
+                const so = soSelect.value;
                 const version = versionSelect.value;
                 const tokenExtra = tokenInput.value.trim();
 
@@ -135,7 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     target_version: version,
                     param_a: customerName,
                     param_b: customerToken,
-                    token_extra: tokenExtra
+                    token_extra: tokenExtra,
+                    so:so
                 };
 
                 try {

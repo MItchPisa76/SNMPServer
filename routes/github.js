@@ -4,12 +4,22 @@ const https = require('https');
 const path = require('path');
 const fs = require('fs');
 const unzipper = require('unzipper');
+const crypto = require('crypto');
 
-const { pipeline } = require('stream/promises');
+
+const { Transform, pipeline } = require('stream');
+const { promisify } = require('util');
+const streamPipeline = promisify(pipeline);
+
 const GITHUB_TOKEN = "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";
 const owner = 'MitchPisa76';
 const repo_crawler = 'MFPCrawler';
 const repo_dist = 'MFPCrawler-distribution';
+const downloadsBaseDir = path.resolve(__dirname, '../downloads');
+
+
+
+
 
 module.exports = function (sessions_Data, prisma, sslOptions) {
 
@@ -36,7 +46,16 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             }
 
             const data = await githubRes.json();
-            res.json(data);
+            const out = [];
+
+            for (const d of data) {
+                out.push({
+                    "tag_name": d["tag_name"],
+                    "prerelease": d["prerelease"],
+                    "created_at": d["created_at"]
+                });
+            }
+            res.json(out);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -46,10 +65,9 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
     // Rotta per avviare il trigger della build via Actions
     router.post('/trigger-build/:customer', async (req, res) => {
         const customer = req.params["customer"];
-        const { target_version, param_a, param_b, token_extra } = req.body;
+        const { target_version, param_a, param_b, token_extra, so } = req.body;
         const workflowId = 'generate-custom-installer-remote.yml';
 
-        const ssl_cert = Buffer.from(sslOptions.cert).toString();
         const userCookie = req.cookies['X-Custom-Context'];
         if (!userCookie || !sessions_Data[userCookie]) {
             console.log('Errore:Ivalid cookie 2:' + userCookie);
@@ -67,20 +85,42 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         if (!sessionExist.customers[customer])
             sessionExist.customers[customer] = { build: {} };
         if (sessionExist.customers[customer].build[target_version]) {
-            if ((sessionExist.customers[customer].build[target_version].status != "done")) {
+            if ((sessionExist.customers[customer].build[target_version].token_extra == token_extra)) {
                 res.status(500).json({ error: "Build already requested for:" + target_version + ":" + customer + ":" + token_extra });
                 return;
             } else {
-                sessionExist.customers[customer].build = {};
+                sessionExist.customers[customer].build = { target_version };
+                sessionExist.customers[customer].build[target_version] = {};
             }
         } else {
             sessionExist.customers[customer].build[target_version] = {};
             sessions_Data[userCookie] = sessionExist;
         }
 
+
+        const ssl_cert = Buffer.from(sslOptions.cert).toString();
+        const cert = new crypto.X509Certificate(ssl_cert);
+
+        // 3. Recupera il Common Name (CN) del Subject
+        const subject = cert.subject;
+        // Il subject è una stringa del tipo: "CN=example.com\nO=MyOrg\n..."
+        const cnMatch = subject.match(/CN=([^,\n]+)/);
+        const commonName = cnMatch ? cnMatch[1] : null;
+
+        console.log('Host Principale (CN):', commonName);
+
+        // 4. Recupera gli host alternativi (Subject Alternative Names - SAN)
+        const subjectAltName = cert.subjectAltName;
+        // La stringa del SAN ha un formato tipo: "DNS:example.com, DNS:www.example.com, IP Address:192.168.1.1"
+
+        console.log('Host Alternativi (SAN):', subjectAltName);
+
+
+
+
         const data = JSON.stringify({
             ref: 'main',
-            inputs: { target_version, param_a, param_b, token_extra, ssl_cert },
+            inputs: { target_version, customer_name: param_a, customer_info: param_b, token_extra, ssl_cert, so_selected: so, server_url: "" + commonName + "," + subjectAltName },
             return_run_details: true
         });
 
@@ -97,13 +137,15 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         });
 
         if (!githubRes.ok) {
-            console.log(`GH /trigger build HTTP Error: ${githubRes.status}`);
+            console.log(`GH /trigger build HTTP Error: ${await githubRes.text()}`);
+            res.status(githubRes.status).json({ error: githubRes.statusText });
+
             return;
         }
         if (githubRes.status === 200) {
             const json = await githubRes.json();
             console.log(json);
-
+            sessionExist.customers[customer].tokenI = customer;
             sessionExist.customers[customer].build[target_version].json = json;
             sessionExist.customers[customer].build[target_version].status = "started";
             sessionExist.customers[customer].build[target_version].token_extra = token_extra;
@@ -158,7 +200,8 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
                 select: { builds: true },
             });
             const str = Buffer.from(nuovoToken.builds).toString();
-            session_data.customers[customer] = JSON.parse(str);
+            if (str.length > 10)
+                session_data.customers[customer] = JSON.parse(str);
         }
         if (!session_data.customers[customer]) {
             res.status(204).json({ error: "wrong customer token" });
@@ -169,11 +212,11 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             res.status(500).json({ error: "already run" });
             return;
         }
-        if (!gitData.build && !gitData.build[target]) {
+        if (!gitData.build || !gitData.build[target]) {
             res.status(204).json({ error: "no customer" });
             return;
         }
-        if (!gitData.build[target].json && !gitData.build[target].json.run_url) {
+        if (!gitData.build[target].json || !gitData.build[target].json.run_url) {
             console.log(gitData.build);
             res.status(500).json({ error: "bad build" });
             return;
@@ -197,6 +240,8 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             throw new Error(`GH /trigger build HTTP Error: ${githubRes.status}`);
         }
 
+        const gTarget = gitData.build[target];
+        gTarget.tokenI = customer;
         if (githubRes.status === 200) {
             const run = await githubRes.json();
             let jobstatus = null;
@@ -204,21 +249,35 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
 
             let fileSavedPath = null;
             // 1. Recupera la lista dei job associati a quel run
-            if (gitData.build[target].status === "done") {
+            if (gTarget.status === "done") {
                 jobstatus = gitData.build[target].status;
                 console.log("jobstatus", jobstatus);
-            } else if (gitData.build[target].status === "downloading") {
-                jobstatus = gitData.build[target].statuss;
+            } else if ((gTarget.status === "downloading") || (gTarget.status === "unzipping")) {
+                jobstatus = gTarget.statuss;
                 console.log("jobstatus", jobstatus);
-            } else if (run.status === 'completed' && run.conclusion === 'success') {
+                if (gTarget.statuss == gTarget.status) {
+                    console.log("error>>>>s", jobstatus);
+                 //   gTarget.status == 'redownload'
+                }
+            } else if ((gTarget.status == 'redownload') || (run.status === 'completed' && run.conclusion === 'success')) {
                 // Se il download non è ancora mai partito, lo avviamo SENZA fare 'await' per non bloccare la risposta HTTP
 
-                downloadAndExtractArtifact(
+                const outputDir = path.join(downloadsBaseDir, customer, target);
+                fs.mkdirSync(outputDir, { recursive: true });
+                const filePath = path.join(outputDir, "MTCInstaller-" + target + (gTarget.token_extra != '' ? ("-" + gTarget.token_extra) : "") + ".exe");
+
+                checkDownloadAndExtractArtifact(
                     run.artifacts_url,
-                    target, customer,
-                    gitData.build[target]
+                    filePath,
+                    gTarget
                 ).catch(err => console.error("Errore background download:", err));
 
+                const optionsBuffer = Buffer.from(JSON.stringify(gitData)).toString('base64');
+
+                const nuovoToken = await prisma.customers.update({
+                    where: { tokenI: gTarget.tokenI },
+                    data: { builds: optionsBuffer },
+                });
 
                 // Rispondi al client con lo stato e il progresso aggiornato in tempo reale
                 jobstatus = `Starting.....`;
@@ -254,8 +313,18 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
                 }
 
             }
-
+            if (run.conclusion == "failure") {
+                gTarget.token_extra += ".fail";
+                delete gTarget.tokenI;
+                gTarget.status = "failed";
+            }
             gitData["retriving-build-status"] = false;
+            const optionsBuffer = Buffer.from(JSON.stringify(gitData)).toString('base64');
+
+            const nuovoToken = await prisma.customers.update({
+                where: { tokenI: customer },
+                data: { builds: optionsBuffer },
+            });
             return res.json({
                 job: jobstatus,
                 status: run.status,
@@ -275,7 +344,151 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         throw new Error(`GH /trigger build HTTP Error EOF: ${githubRes.status}`);
     });
 
-    // Rotta per scaricare i file dalla cartella downloads
+   
+    async function checkDownloadAndExtractArtifact(artifactsUrl, filepath, gd) {
+        const fetchHeaders = {
+            'User-Agent': 'JNODE-MFPCrawler-Dashboard',
+            'Authorization': `Bearer ${GITHUB_TOKEN}`
+        };
+        gd.status = "downloading";
+        gd.progress = 0;
+        gd.statuss = `downloading`;
+        if (fs.existsSync(filepath)) {
+            gd.status = "done";
+            gd.progress = "file exists";
+            gd.savedPath = filepath;
+
+            return;
+        }
+        const res = await fetch(artifactsUrl, { headers: fetchHeaders });
+        if (!res.ok) throw new Error(`Errore recupero artifacts: ${res.status}`);
+
+        const artifactsJson = await res.json();
+        if (!artifactsJson.artifacts?.length) throw new Error('Nessun artifact.');
+        
+        const zipDownloadart = artifactsJson.artifacts.find(o => o.name.includes("Installer"));
+        const zipDownloadUrl = zipDownloadart.archive_download_url;
+
+
+        // AVOIL BLOCCO: Avviamo il consumo del generatore in background SENZA 'await'
+
+        (async () => {
+            try {
+                const generator = downloadWProgress(zipDownloadUrl, filepath, gd);
+
+                for await (const update of generator) {
+                    if (update.tipo === 'progresso') {
+                        // Il ciclo va alla massima velocità e aggiorna l'oggetto in memoria
+                        gd.progress = update.percentuale;
+                        gd.statuss = `downloading (${update.percentuale}%)`;
+                        await new Promise(resolve => setImmediate(resolve));
+                    } else if (update.tipo === 'completato') {
+                        gd.status = "done";
+                        gd.progress = 100;
+                        gd.savedPath = update.savedPath;
+                    }
+                }
+            } catch (err) {
+                console.error("Errore durante il download in background:", err);
+                gd.status = "error";
+                gd.status = "error:" + err.message;
+                gd.error = err.message;
+            }
+        })();
+
+        return null; // Ritorna subito al chiamante, il download lavora in background
+    }
+
+
+    async function* downloadWProgress(url, finalExtractedPath, gd) {
+        const fetchHeaders = {
+            'User-Agent': 'JNODE-MFPCrawler-Dashboard',
+            'Authorization': `Bearer ${GITHUB_TOKEN}`
+        };
+
+
+        // Percorso temporaneo per salvare il file ZIP grezzo
+        const tempZipPath = `${finalExtractedPath}.tmp.zip`;
+        if (!fs.existsSync(tempZipPath)) {
+            // 1. Gestione dei Redirect di GitHub (302 -> Azure/S3)
+            let response = await fetch(url, { headers: fetchHeaders, redirect: 'manual' });
+
+            if (response.status === 301 || response.status === 302) {
+                const redirectUrl = response.headers.get('location');
+                if (!redirectUrl) throw new Error(`Redirect HTTP ${response.status} senza Location`);
+
+                response = await fetch(redirectUrl, {
+                    headers: { 'User-Agent': 'JNODE-MFPCrawler-Dashboard' }
+                });
+            }
+
+            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
+
+
+            const totalBytes = parseInt(response.headers.get('content-length') || '0', 10);
+            let loadedBytes = 0;
+            let lastPercent = -1;
+
+            // --- FASE 1: DOWNLOAD DELLO ZIP SU DISCO ---
+            const fileStream = fs.createWriteStream(tempZipPath);
+
+            // Monitoraggio del progresso durante il download dello ZIP
+            const reader = response.body.getReader();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                fileStream.write(value);
+                loadedBytes += value.length;
+
+                if (totalBytes > 0) {
+                    const percentuale = Math.round((loadedBytes / totalBytes) * 100);
+                    if (percentuale !== lastPercent) {
+                        lastPercent = percentuale;
+                        yield { tipo: 'progresso', percentuale, loadedBytes, totalBytes };
+                    }
+                }
+
+                // Rilascia l'Event Loop per permettere ad Express di rispondere alle chiamate status
+                await new Promise(resolve => setImmediate(resolve));
+            }
+
+            // Chiudi lo stream di scrittura del file temporaneo
+            await new Promise((resolve, reject) => {
+                fileStream.end((err) => err ? reject(err) : resolve());
+            });
+        }
+        // --- FASE 2: DECOMPRESSIONE DAL FILE ZIP LOCALE ---
+        gd.status = "unzipping";
+
+        const directory = await unzipper.Open.file(tempZipPath);
+        const fileEntry = directory.files.find(file => file.type === 'File');
+
+        if (!fileEntry) {
+            // Pulizia del temp in caso di errore
+            // if (fs.existsSync(tempZipPath)) fs.unlinkSync(tempZipPath);
+            //   throw new Error('Nessun file trovato all\'interno dello ZIP.');
+        }
+
+        // Estrazione del file sul percorso finale indicato
+        await new Promise((resolve, reject) => {
+            fileEntry.stream()
+                .pipe(fs.createWriteStream(finalExtractedPath))
+                .on('finish', resolve)
+                .on('error', reject);
+        });
+
+        // Eliminazione del file ZIP temporaneo
+        if (fs.existsSync(tempZipPath)) {
+            //   fs.unlinkSync(tempZipPath);
+        }
+
+        yield { tipo: 'completato', savedPath: finalExtractedPath };
+    }
+
+
+     // Rotta per scaricare i file dalla cartella downloads
     router.get('/download/:customer/:version/:filename', async (req, res) => {
         try {
             // 1. Controllo di autenticazione e sessione (Coerente con le altre rotte)
@@ -288,14 +501,9 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             const { customer, version, filename } = req.params;
 
             // 2. Definizione del percorso base e del percorso file richiesto
-            const downloadsBaseDir = path.resolve(__dirname, '../downloads');
+
             const filePath = path.join(downloadsBaseDir, customer, version, filename);
 
-            // 3. Sicurezza Anti-Path-Traversal (impedisce l'uso di ../ per uscire dalla cartella)
-            if (!filePath.startsWith(downloadsBaseDir)) {
-                console.log('Tentativo di accesso non autorizzato:', filePath);
-                return res.status(403).json({ error: 'Accesso negato: percorso non valido' });
-            }
 
             // 4. Verifica dell'esistenza del file
             if (!fs.existsSync(filePath)) {
@@ -317,7 +525,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             }
         }
     });
-    
+
     // Rotta per ottenere l'elenco dei file scaricati organizzati per param_a e target_version
     router.get('/files-table/:customer', (req, res) => {
         const customer = req.params["customer"];
@@ -340,7 +548,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
                             customer,
                             version,
                             build,
-                            
+
                             fileName: versionPath
                         });
 
@@ -355,61 +563,26 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         }
     });
 
-    async function downloadAndExtractArtifact(artifactsUrl, target_version, customer, gd) {
+    
+    async function* downloadWProgressAA(url, filepath, gd) {
         const fetchHeaders = {
             'User-Agent': 'JNODE-MFPCrawler-Dashboard',
             'Authorization': `Bearer ${GITHUB_TOKEN}`
         };
 
-        const res = await fetch(artifactsUrl, { headers: fetchHeaders });
-        if (!res.ok) throw new Error(`Errore recupero artifacts: ${res.status}`);
+        // 1. Prima richiesta per gestire il Redirect di GitHub (302)
+        let response = await fetch(url, { headers: fetchHeaders, redirect: 'manual' });
 
-        const artifactsJson = await res.json();
-        if (!artifactsJson.artifacts?.length) throw new Error('Nessun artifact.');
-
-        const zipDownloadUrl = artifactsJson.artifacts[0].archive_download_url;
-        const outputDir = path.join(__dirname, '../downloads', customer, target_version);
-        fs.mkdirSync(outputDir, { recursive: true });
-
-        gd.status = "downloading";
-        gd.progress = 0;
-        gd.statuss = `downloading`;
-        // AVOIL BLOCCO: Avviamo il consumo del generatore in background SENZA 'await'
-        (async () => {
-            try {
-                const generator = downloadWProgress(zipDownloadUrl, outputDir, gd);
-
-                for await (const update of generator) {
-                    if (update.tipo === 'progresso') {
-                        // Il ciclo va alla massima velocità e aggiorna l'oggetto in memoria
-                        gd.progress = update.percentuale;
-                        gd.statuss = `downloading (${update.percentuale}%)`;
-                        await new Promise(resolve => setImmediate(resolve));
-                    } else if (update.tipo === 'completato') {
-                        gd.status = "done";
-                        gd.progress = 100;
-                        gd.savedPath = update.savedPath;
-                    }
-                }
-            } catch (err) {
-                console.error("Errore durante il download in background:", err);
-                gd.status = "error";
-                gd.error = err.message;
+        if (response.status === 301 || response.status === 302) {
+            const redirectUrl = response.headers.get('location');
+            if (!redirectUrl) {
+                throw new Error(`Redirect HTTP ${response.status} senza header Location`);
             }
-        })();
-
-        return null; // Ritorna subito al chiamante, il download lavora in background
-    }
-
-
-    async function* downloadWProgress(url, outputDir, gd) {
-        const fetchHeaders = {
-            'User-Agent': 'JNODE-MFPCrawler-Dashboard',
-            'Authorization': `Bearer ${GITHUB_TOKEN}`
-        };
-
-        const response = await fetch(url, { headers: fetchHeaders });
-        if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
+            // 2. Seconda richiesta verso Azure/S3 senza l'header Authorization di GitHub
+            response = await fetch(redirectUrl, {
+                headers: { 'User-Agent': 'JNODE-MFPCrawler-Dashboard' }
+            });
+        }
 
         const totalBytes = parseInt(response.headers.get('content-length') || '0', 10);
         let loadedBytes = 0;
@@ -420,13 +593,13 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         const parser = unzipper.Parse();
 
         parser.on('entry', async (entry) => {
-            const baseName = path.basename(entry.path);
-            const i = baseName.lastIndexOf(".");
-            const tagExtra = gd.token_extra;
-            const fileName = baseName.substring(0, i) + (tagExtra ?? "") + baseName.substring(i);
+            // const baseName = path.basename(entry.path);
+            // const i = baseName.lastIndexOf(".");
+            // const tagExtra = gd.token_extra;
+            // const fileName = baseName.substring(0, i) + (tagExtra ?? "") + baseName.substring(i);
 
-            if (entry.type === 'File' && !extractedFilePath) {
-                extractedFilePath = path.join(outputDir, fileName);
+            if (entry.type === 'File') {
+                const extractedFilePath = filepath;
 
                 try {
                     await fs.promises.access(extractedFilePath);
@@ -458,11 +631,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         parser.end();
         await writePromise;
 
-        if (!extractedFilePath) {
-            throw new Error('Nessun file estratto dallo ZIP.');
-        }
-
-        yield { tipo: 'completato', savedPath: extractedFilePath };
+        yield { tipo: 'completato', savedPath: filepath };
     }
 
     return router;
