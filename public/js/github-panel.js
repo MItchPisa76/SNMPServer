@@ -13,14 +13,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorText = panel.querySelector('.github-panel-error-text');
 
 
-        // Dati del cliente iniettati dal dataset HTML
-        const customerName = panel.dataset.customerName;
-        const customerToken = panel.dataset.customerToken;
 
+        // Dati del cliente iniettati dal dataset HTML
 
         const parentPanel = panel.closest('.customer-card-root');
         const btnToggleFiles = parentPanel.querySelector('.btn-toggle-files');
         const collapseElement = parentPanel.querySelector('.customer-files-collapse');
+
+        const customerName = parentPanel.dataset.customerName;
+        const customerToken = parentPanel.dataset.customerToken;
+
+
+        console.log(customerName, customerToken);
 
 
         let bsCollapse = null;
@@ -58,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     bsCollapse.show();
                     // Quando l'utente lo apre manualmente, aggiorna subito i file
-                    refreshCustomerFilesTable(filesContainer,customerToken, customerName);
+                    refreshCustomerFilesTable(filesContainer, customerToken, customerName);
                 }
             });
         }
@@ -137,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     param_a: customerName,
                     param_b: customerToken,
                     token_extra: tokenExtra,
-                    so:so
+                    so: so
                 };
 
                 try {
@@ -191,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Funzione per ricaricare la tabella file per un determinato cliente
-        async function refreshCustomerFilesTable(container,customerToken, customerName) {
+        async function refreshCustomerFilesTable(container, customerToken, customerName) {
 
             if (!container) return;
 
@@ -206,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const response = await fetch('/api/github/files-table/' +customerToken);
+                const response = await fetch('/api/github/files-table/' + customerToken);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const files = await response.json();

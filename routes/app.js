@@ -33,18 +33,34 @@ module.exports = function (prisma, sessions_Data) {
                 userCookie = null;
             }
             if (!userCookie) {
-                userCookie = crypto.randomBytes(32).toString('hex');
+                userCookie = {
+                    createdAt: new Date().toISOString(),
+                    userCookie: crypto.randomBytes(16).toString('hex')
+                };
+                console.log('Cookie creato con successo!', userCookie);
+
             }
+            const userCookieStr = JSON.stringify(userCookie);
             const userData = { userCookie: userCookie };
-            if (sessions_Data[userCookie]) {
-                userData["session"] = sessions_Data[userCookie];
+            if (sessions_Data[userCookieStr]) {
+                userData["session"] = sessions_Data[userCookieStr];
             } else {
-                sessions_Data[userCookie] = userData;
-                res.cookie('X-Custom-Context', userCookie);
+                sessions_Data[userCookieStr] = userData;
+                sessions_Data[userCookieStr].lastUpdates = [];
+                sessions_Data[userCookieStr].customers = {};
+                // Impostazione del cookie chiamato "userSession"
+                res.cookie('X-Custom-Context', userCookieStr, {
+                    maxAge: 7 * 24 * 60 * 60 * 1000, // Durata: 7 giorni (in millisecondi)
+                    httpOnly: true,                   // Protegge il cookie da accessi JavaScript via client (XSS)
+                    secure: false,                    // Imposta su 'true' in produzione se usi HTTPS
+                    sameSite: 'lax'                   // Protezione base contro attacchi CSRF
+                });
+                //  res.cookie('X-Custom-Context', userCookie);
             }
             delete userData.customers;
             res.render('index', { hosts: hostsList, customers: customers, userData: userData });
         } catch (error) {
+            console.error(error);
             res.status(500).send("Errore nel caricamento della pagina:" + error);
         }
     });
@@ -58,8 +74,7 @@ module.exports = function (prisma, sessions_Data) {
                 res.status(404).send("Invalid coookie:" + userCookie);
                 return;
             }
-            if (!sessions_Data[userCookie].lastUpdates)
-                sessions_Data[userCookie].lastUpdates = [];
+
             const lastUpdates = sessions_Data[userCookie].lastUpdates;
 
             const dati = await prisma.dati.findMany({});
@@ -75,6 +90,7 @@ module.exports = function (prisma, sessions_Data) {
                         delete json.lastUpdatedMantained;
                     }
                     json["serial"] = serial;
+                    json["token"] = d.token;
                     toRefresh.push(json);
                 }
                 lastUpdates[serial] = JSON.parse(d.lastUpdates);
@@ -86,7 +102,8 @@ module.exports = function (prisma, sessions_Data) {
 
             for (const h of updateHCW) {
                 const crawler = JSON.parse(h.crawler);
-
+                if (!crawler)
+                    continue;
                 if ("" + crawler["updateRemote"] == "true") {
                     crawler["updateRemote"] = false;
                     toRefresh.push(h);
@@ -126,9 +143,15 @@ module.exports = function (prisma, sessions_Data) {
                 return;
             }
 
+            const tokenI = req.headers["customertoken"];// Buffer.from(req.headers["customertoken"], 'base64').toString();
             const serial = req.params.serial;
             const maintainance = await prisma.dati.findUnique({
-                where: { serial: serial },
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: tokenI
+                    }
+                },
                 select: { serial: true, dataconsumabili: true }
             });
             if (!maintainance) return res.status(404).send('maintenance non trovato:' + serial);
@@ -136,6 +159,7 @@ module.exports = function (prisma, sessions_Data) {
             maintainance["dataconsumabili"] = JSON.parse(Buffer.from(maintainance["dataconsumabili"]).toString('utf-8'));
             res.render('partials/mfp-tab-status-maintenance.ejs', { mfp: maintainance });
         } catch (error) {
+            console.error(error);
             res.status(500).send('Errore aggiornamento controlli');
         }
     });
@@ -148,9 +172,16 @@ module.exports = function (prisma, sessions_Data) {
                 res.status(404).send("Invalid coookie:" + userCookie);
                 return;
             }
+
+            const tokenI = req.headers["customertoken"];// Buffer.from(req.headers["customertoken"], 'base64').toString();
             const serial = req.params.serial;
             const alerts = await prisma.dati.findUnique({
-                where: { serial: serial },
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: tokenI
+                    }
+                },
                 select: { serial: true, dataalerts: true }
             });
             if (!alerts) return res.status(404).send('alerts non trovato:' + serial);
@@ -158,6 +189,7 @@ module.exports = function (prisma, sessions_Data) {
             alerts["dataalerts"] = JSON.parse(Buffer.from(alerts["dataalerts"]).toString('utf-8'));
             res.render('partials/mfp-tab-status-alerts.ejs', { mfp: alerts });
         } catch (error) {
+            console.error(error);
             res.status(500).send('Errore aggiornamento controlli');
         }
     });
@@ -179,21 +211,8 @@ module.exports = function (prisma, sessions_Data) {
 
             res.render('partials/crawler-controls', { host: host });
         } catch (error) {
+            console.error(error);
             res.status(500).send('Errore aggiornamento controlli');
-        }
-    });
-
-
-
-    router.post('/api/users', async (req, res) => {
-        const { name, email } = req.body;
-        if (!name || !email) return res.status(400).json({ success: false, error: "Nome e email sono obbligatori" });
-        try {
-            const newUser = await prisma.user.create({ data: { name, email } });
-            res.status(201).json({ success: true, user: newUser });
-        } catch (error) {
-            if (error.code === 'P2002') return res.status(400).json({ success: false, error: "Questa email è già registrata" });
-            res.status(500).json({ success: false, error: "Errore interno del server" });
         }
     });
 
@@ -223,6 +242,7 @@ module.exports = function (prisma, sessions_Data) {
             });
             res.status(201).json({ success: true, value: newvalue });
         } catch (error) {
+            console.error(error);
             res.status(500).json({ success: false, error: "Errore interno del server", msg: error });
         }
     });

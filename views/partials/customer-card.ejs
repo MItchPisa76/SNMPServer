@@ -1,4 +1,6 @@
-<div class="card mb-4 shadow-sm border-0 customer-card-root">
+<div class="card mb-4 shadow-sm border-0 customer-card-root"
+    data-customer-name="<%= customer.name %>"
+    data-customer-token="<%= customer.tokenI %>">
     <!-- CUSTOMER HEADER -->
     <div class="card-header bg-primary text-white d-flex flex-column gap-2 py-3">
         <div class="d-flex justify-content-between align-items-center w-100">
@@ -18,22 +20,20 @@
                 <span class="badge bg-light text-success">
                     <%= customer.dati ? customer.dati.length : 0 %> MFP
                 </span>
-                <!-- GESTITO TOTALMENTE DA JAVASCRIPT -->
+
                 <button class="btn btn-sm btn-outline-light ms-2 btn-toggle-files" type="button">
                     <i class="bi bi-folder-symlink-fill"></i> Files Generati
                 </button>
             </div>
         </div>
 
-        <!-- MODIFICATO: Rimosso ID, aggiunta classe identificativa per il collapse -->
         <div class="collapse customer-files-collapse mt-2 text-dark">
             <div class="card card-body bg-light border-0 text-start shadow-inner p-3">
                 <h6 class="border-bottom pb-2 mb-2 text-primary fw-bold">
                     <!-- BARRA GITHUB -->
-                    <%- include('github-panel', { customer: customer }) %>
+                    <%- include('github-panel', {}) %>
                 </h6>
 
-                <!-- TABELLA FILE SCARICATI (Senza ID) -->
                 <div class="customer-files-container">
                     <%- include('customer-files-table', { customer: customer }) %>
                 </div>
@@ -57,7 +57,7 @@
                                         <%= host.hostname || 'Host Sconosciuto' %>
                                     </h6>
                                     <small class="text-muted">
-                                        <% try { const ipv4=JSON.parse(host.IPV4); %>
+                                        <% try { const ipv4=host.IPV4; %>
                                             IP: <code><%= ipv4[0] ? ipv4[0].localIPv4 : 'N/D' %></code>
                                             <%= (ipv4 && ipv4[0].localIF) ? `(${ipv4[0].localIF})` : '' %>
                                                 <% } catch(e) { %>

@@ -1,0 +1,23 @@
+#cloud-config
+package_update: true
+
+# 1. Installa il server SNMP e le utility
+packages:
+  - snmpd
+  - snmp
+
+# 2. Scrive la configurazione personalizzata dentro la VM
+write_files:
+  - path: /etc/snmp/snmpd.conf
+    owner: root:root
+    permissions: '0600'
+    content: |
+      agentAddress udp:161
+      rocommunity mia_community default
+      sysLocation    "Laboratorio Virtuale Multipass"
+      sysContact     "admin@tuodominio.it"
+      extend .1.3.6.1.4.1.8072.1.3.2.3.1.1.4.1 status_servizio /bin/echo "Funzionante"
+
+# 3. Forza il riavvio del servizio per applicare le modifiche
+runcmd:
+  - [ systemctl, restart, snmpd ]

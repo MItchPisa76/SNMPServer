@@ -80,8 +80,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             return;
         }
         let sessionExist = sessions_Data[userCookie];
-        if (!sessionExist.customers)
-            sessionExist.customers = {};
+
         if (!sessionExist.customers[customer])
             sessionExist.customers[customer] = { build: {} };
         if (sessionExist.customers[customer].build[target_version]) {
@@ -199,9 +198,21 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
                 where: { tokenI: customer },
                 select: { builds: true },
             });
+            if (!nuovoToken.builds) {
+                console.log(">>>> no builds", customer, target);
+                nuovoToken.builds ="{}";
+               // res.status(500).json({ error: "bad build {}" });
+               // return;
+            }
+
             const str = Buffer.from(nuovoToken.builds).toString();
             if (str.length > 10)
                 session_data.customers[customer] = JSON.parse(str);
+            else {
+                console.log(">>>> no builds SQL", customer, target,str);
+                res.status(500).json({ error: "no build session data SQL" });
+                return;
+            }
         }
         if (!session_data.customers[customer]) {
             res.status(204).json({ error: "wrong customer token" });
@@ -213,6 +224,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             return;
         }
         if (!gitData.build || !gitData.build[target]) {
+            console.log("error:no customer", gitData.build);
             res.status(204).json({ error: "no customer" });
             return;
         }
@@ -237,6 +249,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
 
         if (!githubRes.ok) {
             gitData["retriving-build-status"] = false;
+            console.log(await githubRes.text());
             throw new Error(`GH /trigger build HTTP Error: ${githubRes.status}`);
         }
 
@@ -257,7 +270,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
                 console.log("jobstatus", jobstatus);
                 if (gTarget.statuss == gTarget.status) {
                     console.log("error>>>>s", jobstatus);
-                 //   gTarget.status == 'redownload'
+                    //   gTarget.status == 'redownload'
                 }
             } else if ((gTarget.status == 'redownload') || (run.status === 'completed' && run.conclusion === 'success')) {
                 // Se il download non è ancora mai partito, lo avviamo SENZA fare 'await' per non bloccare la risposta HTTP
@@ -298,7 +311,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
 
 
                     // 2. Prendi il job attualmente in esecuzione (o il primo della lista)
-                    const activeJob = jobsData.jobs[0];
+                    const activeJob = jobsData.jobs[1];
 
                     if (activeJob && (activeJob.status != "completed")) {
                         console.log(`Stato Job generale: ${activeJob.status}`); // es. "in_progress"
@@ -344,7 +357,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         throw new Error(`GH /trigger build HTTP Error EOF: ${githubRes.status}`);
     });
 
-   
+
     async function checkDownloadAndExtractArtifact(artifactsUrl, filepath, gd) {
         const fetchHeaders = {
             'User-Agent': 'JNODE-MFPCrawler-Dashboard',
@@ -365,14 +378,14 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
 
         const artifactsJson = await res.json();
         if (!artifactsJson.artifacts?.length) throw new Error('Nessun artifact.');
-        
+
         const zipDownloadart = artifactsJson.artifacts.find(o => o.name.includes("Installer"));
         const zipDownloadUrl = zipDownloadart.archive_download_url;
 
 
         // AVOIL BLOCCO: Avviamo il consumo del generatore in background SENZA 'await'
 
-        (async () => {
+        gd.downloadAsync = (async () => {
             try {
                 const generator = downloadWProgress(zipDownloadUrl, filepath, gd);
 
@@ -408,7 +421,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
 
 
         // Percorso temporaneo per salvare il file ZIP grezzo
-        const tempZipPath = `${finalExtractedPath}.tmp.zip`;
+        const tempZipPath = `${finalExtractedPath}.zip`;
         if (!fs.existsSync(tempZipPath)) {
             // 1. Gestione dei Redirect di GitHub (302 -> Azure/S3)
             let response = await fetch(url, { headers: fetchHeaders, redirect: 'manual' });
@@ -488,7 +501,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
     }
 
 
-     // Rotta per scaricare i file dalla cartella downloads
+    // Rotta per scaricare i file dalla cartella downloads
     router.get('/download/:customer/:version/:filename', async (req, res) => {
         try {
             // 1. Controllo di autenticazione e sessione (Coerente con le altre rotte)
@@ -563,7 +576,7 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         }
     });
 
-    
+
     async function* downloadWProgressAA(url, filepath, gd) {
         const fetchHeaders = {
             'User-Agent': 'JNODE-MFPCrawler-Dashboard',

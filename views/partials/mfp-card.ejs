@@ -44,11 +44,9 @@ const isOnline = statoOnline.startsWith('ONLINE');
                 </li>
             </ul>
 
-            <div class="tab-content" id="mfpTabContent-<%= mfp.serial %>">
+            <div class="tab-content">
                 <%- include('mfp-tab-status', { mfp: mfp }) %>
-                <%- include('mfp-tab-info', { mfp: mfp }) %>
-                
-               
+                <%- include('mfp-tab-info', { mfp: mfp }) %>                               
             </div>
         </div>
     </div>

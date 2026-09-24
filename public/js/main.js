@@ -1,6 +1,6 @@
 // Caricamento releases e gestione invio form GitHub
 document.addEventListener('DOMContentLoaded', () => {
-      // ==========================================
+    // ==========================================
     // 1. SISTEMA DI REFRESH PAGINA
     // ==========================================
     const refreshBtn = document.getElementById('btn-refresh-now');
@@ -19,13 +19,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    async function updateRefreshAlerts(serial) {
+    async function updateRefreshAlerts(serial, tokenCustomer) {
         const container = document.getElementById(`alerts-container-${serial}`);
         if (!container) return;
 
         try {
             // Effettua la chiamata alla rotta partial
-            const response = await fetch(`/api/mfp/${serial}/alerts`);
+            const response = await fetch(`/api/mfp/${serial}/alerts`, {
+                headers: { "customertoken": tokenCustomer }
+            });
 
             if (!response.ok) {
                 throw new Error(`Errore HTTP: ${response.status}`);
@@ -42,13 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function updateRefreshMantained(serial) {
+    async function updateRefreshMantained(serial, tokenCustomer) {
         const container = document.getElementById(`maintenance-container-${serial}`);
         if (!container) return;
 
         try {
             // Effettua la chiamata alla rotta partial
-            const response = await fetch(`/api/mfp/${serial}/maintenance`);
+            const response = (await fetch(`/api/mfp/${serial}/maintenance`, {
+                headers: { "customertoken": tokenCustomer }
+            }));
 
             if (!response.ok) {
                 throw new Error(`Errore HTTP: ${response.status}`);
@@ -85,13 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             console.log("CRAWLER", c);
                         }
                         if (c["lastUpdatedAlerts"]) {
-                            updateRefreshAlerts(c["serial"]);
+                            updateRefreshAlerts(c["serial"], c["token"]);
                             console.log("ALERT", c);
                         }
 
                         if (c["lastUpdatedMantained"]) {
-                            updateRefreshMantained(c["serial"]);
-                            console.log("ALERT", c);
+                            updateRefreshMantained(c["serial"], c["token"]);
+                            console.log("Maintein", c);
                         }
 
                     }

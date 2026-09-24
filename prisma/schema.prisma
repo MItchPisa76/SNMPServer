@@ -12,8 +12,17 @@ model User {
   email String @unique
 }
 
+model customers {
+  tokenI      String  @id
+  name        String  @default("new-entry?")
+  lastUpdates String?
+  builds      Bytes?
+  dati        dati[]
+  hosts       hosts[]
+}
+
 model dati {
-  serial          String    @id
+  serial          String
   datainfo        String?
   dataconsumabili Bytes?
   datacontatori   String?
@@ -21,7 +30,9 @@ model dati {
   token           String
   data            Bytes?
   lastUpdates     String?
-  customer        customers @relation(fields: [token], references: [tokenI])
+  customers       customers @relation(fields: [token], references: [tokenI])
+
+  @@unique([serial, token])
 }
 
 model hosts {
@@ -30,8 +41,9 @@ model hosts {
   options    Bytes?
   IPV4       String?
   crawler    String?
-  customerID String
-  customer   customers @relation(fields: [customerID], references: [tokenI])
+  customerID String    @default("none-error")
+  knownhosts Bytes?
+  customers  customers @relation(fields: [customerID], references: [tokenI])
 }
 
 model oids {
@@ -43,13 +55,4 @@ model oids {
   priority    Int     @default(-1)
   mode        Int?    @default(0)
   id          Int     @id @unique(map: "sqlite_autoindex_oids_1") @default(autoincrement())
-}
-
-model customers {
-  tokenI      String  @id
-  name        String  @default("new-entry?")
-  lastUpdates String?
-  builds      Bytes?
-  dati        dati[]
-  hosts       hosts[]
 }
