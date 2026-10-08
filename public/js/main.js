@@ -36,8 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Ottiene l'HTML parziale restituito dal server
             const updatedHtml = await response.text();
 
-            // Inietta l'HTML aggiornato direttamente nel DOM senza refresh
-            container.innerHTML = updatedHtml;
+            container.classList.remove('show');
+
+            setTimeout(() => {
+                // 2. Aggiorna contenuto e riattiva fade-in
+                console.log(updatedHtml);
+                container.innerHTML = updatedHtml;
+                if (container.classList.contains('active'))
+                    container.classList.add('show');
+            }, 150);
 
         } catch (error) {
             console.error(`Errore durante il refresh dell'mfp alert ${serial}:`, error);
@@ -61,14 +68,59 @@ document.addEventListener('DOMContentLoaded', () => {
             // Ottiene l'HTML parziale restituito dal server
             const updatedHtml = await response.text();
 
+            container.classList.remove('show');
+
+            setTimeout(() => {
+                // 2. Aggiorna contenuto e riattiva fade-in
+                console.log(updatedHtml);
+                container.innerHTML = updatedHtml;
+                if (container.classList.contains('active'))
+                    container.classList.add('show');
+            }, 150);
             // Inietta l'HTML aggiornato direttamente nel DOM senza refresh
-            container.innerHTML = updatedHtml;
+
 
         } catch (error) {
             console.error(`Errore durante il refresh dell'mfp alert ${serial}:`, error);
         }
     }
 
+    async function updateRefreshInfotab(serial, tokenCustomer) {
+        const container = document.getElementById(`info-container-${serial}`);
+        // const tabPane = document.getElementById(`mfp-tab-${serial}`);
+
+        if (!container) return;
+
+
+        try {
+            // Effettua la chiamata alla rotta partial
+            const response = (await fetch(`/api/mfp/${serial}/info`, {
+                headers: { "customertoken": tokenCustomer }
+            }));
+
+            if (!response.ok) {
+                throw new Error(`Errore HTTP: ${response.status}`);
+            }
+
+            // Ottiene l'HTML parziale restituito dal server
+            const updatedHtml = await response.text();
+
+            // Inietta l'HTML aggiornato direttamente nel DOM senza refresh
+
+            container.classList.remove('show');
+
+            setTimeout(() => {
+                // 2. Aggiorna contenuto e riattiva fade-in
+                console.log(updatedHtml);
+                container.innerHTML = updatedHtml;
+                if (container.classList.contains('active'))
+                    container.classList.add('show');
+            }, 150);
+
+        } catch (error) {
+            console.error(`Errore durante il refresh dell'mfp alert ${serial}:`, error);
+        }
+    }
     // Gestione timer auto-refresh
     function startAutoRefresh(seconds) {
         if (refreshTimer) clearInterval(refreshTimer);
@@ -76,28 +128,34 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshTimer = setInterval(async () => {
 
                 const res = await fetch('/refresh', {
-                    method: 'POST',
+                    method: 'GET',
                     headers: { 'Content-Type': 'application/json' },
-                    body: ""
+
                 });
                 if (res.ok) {
                     //console.log(await res.body);
                     const content = await res.json();
+
+                    //   if (content.lastUpdatedAlert)
+
                     for (const c of content) {
+
                         if (c["crawler"]) {
                             updateRefreshControls(c["token"]);
                             console.log("CRAWLER", c);
                         }
-                        if (c["lastUpdatedAlerts"]) {
+                        if (c["lastUpdatedAlert"]) {
                             updateRefreshAlerts(c["serial"], c["token"]);
                             console.log("ALERT", c);
                         }
 
-                        if (c["lastUpdatedMantained"]) {
+                        if (c["lastUpdatedMaintenance"]) {
                             updateRefreshMantained(c["serial"], c["token"]);
                             console.log("Maintein", c);
                         }
-
+                        if (c["lastUpdatedInfo"]) {
+                            updateRefreshInfotab(c["serial"], c["token"]);
+                        }
                     }
 
                 }
@@ -157,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (value === 'true') clickedButton.classList.add('btn-success');
         else if (value === 'false') clickedButton.classList.add('btn-secondary');
-        else if (value === 'once') clickedButton.classList.add('btn-info', 'text-white');
+        else if (value.includes('once')) clickedButton.classList.add('btn-info', 'text-white');
     }
 
 
@@ -180,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) throw new Error(`Errore risposta server: ${response.status}`);
-
+            console.log(response.body);
             siblingButtons.forEach(b => b.classList.add('disabled'));
 
             updateButtonStyles(siblingButtons, btn, value);
@@ -218,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(`Errore durante il refresh dell'host ${hostToken}:`, error);
         }
     }
+
 
     const crawlerButtons = document.querySelectorAll('.crawler-btn');
 

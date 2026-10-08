@@ -200,16 +200,16 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
             });
             if (!nuovoToken.builds) {
                 console.log(">>>> no builds", customer, target);
-                nuovoToken.builds ="{}";
-               // res.status(500).json({ error: "bad build {}" });
-               // return;
+                nuovoToken.builds = "{}";
+                // res.status(500).json({ error: "bad build {}" });
+                // return;
             }
 
             const str = Buffer.from(nuovoToken.builds).toString();
             if (str.length > 10)
                 session_data.customers[customer] = JSON.parse(str);
             else {
-                console.log(">>>> no builds SQL", customer, target,str);
+                console.log(">>>> no builds SQL", customer, target, str);
                 res.status(500).json({ error: "no build session data SQL" });
                 return;
             }
@@ -236,6 +236,9 @@ module.exports = function (sessions_Data, prisma, sslOptions) {
         const run_url = gitData.build[target].json.run_url;
         gitData["retriving-build-status"] = true;
 
+        if (gitData.build[target].status == "done") {
+            return res.status(500).json({ error: "build done" });
+        }
 
 
         const githubRes = await fetch(run_url, {

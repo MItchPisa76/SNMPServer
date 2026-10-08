@@ -37,19 +37,20 @@ module.exports = function (prisma, sessions_Data) {
                     createdAt: new Date().toISOString(),
                     userCookie: crypto.randomBytes(16).toString('hex')
                 };
+                userCookie = JSON.stringify(userCookie);
                 console.log('Cookie creato con successo!', userCookie);
 
             }
-            const userCookieStr = JSON.stringify(userCookie);
+            //const userCookieStr = JSON.stringify(userCookie);
             const userData = { userCookie: userCookie };
-            if (sessions_Data[userCookieStr]) {
-                userData["session"] = sessions_Data[userCookieStr];
+            if (sessions_Data[userCookie]) {
+                userData["session"] = sessions_Data[userCookie];
             } else {
-                sessions_Data[userCookieStr] = userData;
-                sessions_Data[userCookieStr].lastUpdates = [];
-                sessions_Data[userCookieStr].customers = {};
+                sessions_Data[userCookie] = userData;
+                sessions_Data[userCookie].lastUpdates = [];
+                sessions_Data[userCookie].customers = {};
                 // Impostazione del cookie chiamato "userSession"
-                res.cookie('X-Custom-Context', userCookieStr, {
+                res.cookie('X-Custom-Context', userCookie, {
                     maxAge: 7 * 24 * 60 * 60 * 1000, // Durata: 7 giorni (in millisecondi)
                     httpOnly: true,                   // Protegge il cookie da accessi JavaScript via client (XSS)
                     secure: false,                    // Imposta su 'true' in produzione se usi HTTPS
@@ -66,7 +67,7 @@ module.exports = function (prisma, sessions_Data) {
     });
 
     // 2 REFRESH VARI
-    router.post('/refresh', async (req, res) => {
+    router.get('/refresh', async (req, res) => {
         try {
             let userCookie = req.cookies['X-Custom-Context'];
             if (!userCookie || !sessions_Data[userCookie]) {
@@ -77,23 +78,36 @@ module.exports = function (prisma, sessions_Data) {
 
             const lastUpdates = sessions_Data[userCookie].lastUpdates;
 
-            const dati = await prisma.dati.findMany({});
+            const dati = await prisma.dati.findMany({
+                select : {
+                    lastUpdates:true,
+                    serial:true,
+                    token : true
+                }
+            });
             const toRefresh = [];
             for (const d of dati) {
                 const serial = d.serial;
+                const json = JSON.parse(d.lastUpdates);
+
                 if (lastUpdates[serial]) {
-                    const json = JSON.parse(d.lastUpdates);
-                    if (json.lastUpdatedAlerts == lastUpdates[serial].lastUpdatedAlerts) {
-                        delete json["lastUpdatedAlerts"];
+                    if (json.lastUpdatedAlert == lastUpdates[serial].lastUpdatedAlert) {
+                        delete json["lastUpdatedAlert"];
                     }
-                    if (json.lastUpdatedMantained == lastUpdates[serial].lastUpdatedMantained) {
-                        delete json.lastUpdatedMantained;
+                    if (json.lastUpdatedMaintenance == lastUpdates[serial].lastUpdatedMaintenance) {
+                        delete json.lastUpdatedMaintenance;
                     }
-                    json["serial"] = serial;
-                    json["token"] = d.token;
-                    toRefresh.push(json);
+                    if (json.lastUpdatedInfo == lastUpdates[serial].lastUpdatedInfo) {
+                        delete json.lastUpdatedInfo;
+                    } else {
+                        console.log("json.lastUpdatedInfo:", json.lastUpdatedInfo);
+                    }                  
                 }
+
                 lastUpdates[serial] = JSON.parse(d.lastUpdates);
+                json["serial"] = serial;
+                json["token"] = d.token;
+                toRefresh.push(json);
             }
 
             const updateHCW = await prisma.hosts.findMany({
@@ -104,7 +118,12 @@ module.exports = function (prisma, sessions_Data) {
                 const crawler = JSON.parse(h.crawler);
                 if (!crawler)
                     continue;
-                if ("" + crawler["updateRemote"] == "true") {
+                if (!sessions_Data[userCookie].crawlerUpdate) {
+                    sessions_Data[userCookie].crawlerUpdate = {};
+                }
+                const lastUpdateRemote = sessions_Data[userCookie].crawlerUpdate[h.token];
+                if (lastUpdateRemote != crawler.lastUpdateRemote) {
+                    sessions_Data[userCookie].crawlerUpdate[h.token] = crawler.lastUpdateRemote;
                     crawler["updateRemote"] = false;
                     toRefresh.push(h);
                     await prisma.hosts.update({
@@ -163,6 +182,68 @@ module.exports = function (prisma, sessions_Data) {
             res.status(500).send('Errore aggiornamento controlli');
         }
     });
+
+    // GET maintenace data of  :serial
+    router.get('/api/mfp/:serial/info', async (req, res) => {
+        try {
+            let userCookie = req.cookies['X-Custom-Context'];
+            if (!userCookie || !sessions_Data[userCookie]) {
+                console.log('Errore:Ivalid cookie:' + userCookie);
+                res.status(404).send("Invalid coookie:" + userCookie);
+                return;
+            }
+
+            const tokenI = req.headers["customertoken"];// Buffer.from(req.headers["customertoken"], 'base64').toString();
+            const serial = req.params.serial;
+            const dataInfo = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: tokenI
+                    }
+                },
+                select: { serial: true, datainfo: true }
+            });
+            /*
+            const jdati = JSON.parse(d.datainfo)
+                            const oids = Object.keys(jdati);
+                            const completa = await prisma.oids.findMany({
+                                where: { oid: { in: oids } },
+                            });
+            
+                            completa.forEach(item => {
+                                if (jdati[item.oid]) {
+                                    jdati[item.oid] = {
+                                        ...jdati[item.oid], // mantiene proprietà esistenti
+                                        ...item                  // oppure fai merge dei campi: ...item
+                                    };
+                                }
+                            });
+            */
+            if (!dataInfo) return res.status(404).send('dataInfo non trovato:' + serial);
+
+            dataInfo["datainfo"] = JSON.parse(Buffer.from(dataInfo["datainfo"]).toString('utf-8'));
+            const jdati = dataInfo["datainfo"];
+            const oids = Object.keys(jdati);
+            const completa = await prisma.oids.findMany({
+                where: { oid: { in: oids } },
+            });
+
+            completa.forEach(item => {
+                if (jdati[item.oid]) {
+                    jdati[item.oid] = {
+                        ...jdati[item.oid], // mantiene proprietà esistenti
+                        ...item                  // oppure fai merge dei campi: ...item
+                    };
+                }
+            });
+            res.render('partials/mfp-tab-info.ejs', { mfp: dataInfo });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Errore aggiornamento controlli');
+        }
+    });
+
     // GET alerts data of  :serial
     router.get('/api/mfp/:serial/alerts', async (req, res) => {
         try {
@@ -209,6 +290,7 @@ module.exports = function (prisma, sessions_Data) {
             });
             if (!host) return res.status(404).send('Host non trovato:' + token);
 
+            host.crawler = JSON.parse(host.crawler);
             res.render('partials/crawler-controls', { host: host });
         } catch (error) {
             console.error(error);

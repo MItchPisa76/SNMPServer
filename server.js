@@ -55,7 +55,7 @@ server.post('/mfp', async (req, res) => {
         if (token === "PLEASE") return res.status(401).send("WRONG token");
         const tokenI = Buffer.from(req.headers["customertoken"], 'base64').toString();
 
-        const map = req.body;
+
         const checkCustomer = await prisma.customers.findUnique({
             where: { "tokenI": tokenI },
             select: { tokenI: true },
@@ -63,17 +63,18 @@ server.post('/mfp', async (req, res) => {
 
         if (!checkCustomer) return res.status(401).send("Invalid customerToken:" + req.headers["customertoken"]);
 
-        const jsonStringConsumabili = JSON.stringify(map.dataconsumabili);
-        const jsonStringAlerts = JSON.stringify(map.alerts);
-
+        const map = req.body;
+        const jsonStringConsumabili = JSON.stringify(map.maintenanceinfo);
+        const jsonStringAlerts = JSON.stringify(map.alertsinfo);
+        const jsonStringInfo = JSON.stringify(map.datainfo);
         const update = {
-            datainfo: JSON.stringify(map.info),
+            datainfo: jsonStringInfo,
             "lastUpdates": JSON.stringify(map.lastUpdates),
         };
         const create = {
             serial: serial,
             token: tokenI,
-            datainfo: JSON.stringify(map.info),
+            datainfo: jsonStringInfo,
             "lastUpdates": JSON.stringify(map.lastUpdates),
         };
         if (jsonStringConsumabili) {
@@ -99,7 +100,7 @@ server.post('/mfp', async (req, res) => {
             create
         });
 
-        if (!nuovoToken) return res.status(401).send("Invalid token:" + token);
+        if (!nuovoToken) return res.status(401).send("Invalid upsert:" + tokenI + " serial:" + serial);
 
         if (nuovoToken["dataalerts"]) nuovoToken["dataalerts"] = Buffer.from(nuovoToken["dataalerts"]).toString('utf-8');
         if (nuovoToken["dataconsumabili"]) nuovoToken["dataconsumabili"] = Buffer.from(nuovoToken["dataconsumabili"]).toString('utf-8');
@@ -225,15 +226,51 @@ server.post('/knownhosts', async (req, res) => {
 });
 
 
-
-
-server.get('/hello', async (req, res) => {
+server.post('/remote', async (req, res) => {
     try {
         const token = req.headers["token"];
         if (!token) return res.status(500).send("Errore token");
-        const customerToken = Buffer.from(req.headers["customertoken"], 'base64').toString();
+        if (token === "PLEASE") return res.status(401).send("WRONG token");
+        const tokenI = Buffer.from(req.headers["customertoken"], 'base64').toString();
+
+
+        const checkCustomer = await prisma.customers.findUnique({
+            where: { "tokenI": tokenI },
+            select: { tokenI: true },
+        });
+
+        if (!checkCustomer) return res.status(401).send("Invalid customerToken:" + req.headers["customertoken"]);
+        
+        const nuovoToken = await prisma.hosts.update({
+            where: { token: token },
+            data: { crawler: JSON.stringify(req.body) },
+        });
+
+        res.send(nuovoToken);
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+
+
+server.get('/remote', async (req, res) => {
+    try {
+        const token = req.headers["token"];
+
+        if (!token) return res.status(500).send("Errore token");
+        if (token === "PLEASE") return res.status(401).send("WRONG token");
+        const tokenI = Buffer.from(req.headers["customertoken"], 'base64').toString();
+
+
+        const checkCustomer = await prisma.customers.findUnique({
+            where: { "tokenI": tokenI },
+            select: { tokenI: true },
+        });
+
+        if (!checkCustomer) return res.status(401).send("Invalid customerToken:" + req.headers["customertoken"]);
+
         const nuovoToken = await prisma.hosts.findUnique({
-            where: { token: token, "customerID": customerToken },
+            where: { token: token, "customerID": tokenI },
             select: { crawler: true },
         });
         res.send(nuovoToken);
@@ -260,20 +297,6 @@ server.post('/knownhosts', async (req, res) => {
 });
 
 
-server.post('/hello', async (req, res) => {
-    try {
-        const token = req.headers["token"];
-        if (!token) return res.status(500).send("Errore token");
-
-        const nuovoToken = await prisma.hosts.update({
-            where: { token: token },
-            data: { crawler: JSON.stringify(req.body) },
-        });
-        res.send(nuovoToken);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
 
 server.get('/oids/vendor/:vendor', async (req, res) => {
     let vendor = req.params.vendor;
@@ -282,7 +305,7 @@ server.get('/oids/vendor/:vendor', async (req, res) => {
         if (!token) return res.status(500).send("Errore token");
 
         if (vendor.endsWith("*")) {
-            vendor = vendor.substring(0, vendor.length - 1);
+            vendor = vendor.substring(0, vendor.length - 2);
 
             const nuovoToken = await prisma.oids.groupBy(
                 {
@@ -292,6 +315,19 @@ server.get('/oids/vendor/:vendor', async (req, res) => {
                     where: { vendoroid: { startsWith: vendor } }
                 });
 
+            if (nuovoToken)
+                res.send(nuovoToken);
+            else
+                res.status(401).send("NOT FOUND");
+            return;
+        }
+        if (vendor == "-") {
+            const nuovoToken = await prisma.oids.findMany(
+                {
+                    where: {
+                        vendoroid: null
+                    }
+                });
             if (nuovoToken)
                 res.send(nuovoToken);
             else
