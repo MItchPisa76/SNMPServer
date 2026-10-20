@@ -79,10 +79,10 @@ module.exports = function (prisma, sessions_Data) {
             const lastUpdates = sessions_Data[userCookie].lastUpdates;
 
             const dati = await prisma.dati.findMany({
-                select : {
-                    lastUpdates:true,
-                    serial:true,
-                    token : true
+                select: {
+                    lastUpdates: true,
+                    serial: true,
+                    token: true
                 }
             });
             const toRefresh = [];
@@ -101,7 +101,7 @@ module.exports = function (prisma, sessions_Data) {
                         delete json.lastUpdatedInfo;
                     } else {
                         console.log("json.lastUpdatedInfo:", json.lastUpdatedInfo);
-                    }                  
+                    }
                 }
 
                 lastUpdates[serial] = JSON.parse(d.lastUpdates);
@@ -124,7 +124,7 @@ module.exports = function (prisma, sessions_Data) {
                 const lastUpdateRemote = sessions_Data[userCookie].crawlerUpdate[h.token];
                 if (lastUpdateRemote != crawler.lastUpdateRemote) {
                     sessions_Data[userCookie].crawlerUpdate[h.token] = crawler.lastUpdateRemote;
-                    crawler["updateRemote"] = false;
+                    //   crawler["updateRemote"] = false;
                     toRefresh.push(h);
                     await prisma.hosts.update({
                         where: { token: h.token },
@@ -149,8 +149,103 @@ module.exports = function (prisma, sessions_Data) {
             res.status(500).send(error);
         }
     });
+    // 3 QUERY OID
+    router.get('/oids/:serial/suggestions', async (req, res) => {
+        const serial = req.params.serial;
+        const filter = req.query;
+        const customerToken = req.headers.customertoken;
+        try {
+            const where = {};
+            if (filter.brandShort)
+                where.brandShort = {
+                    contains: filter.brandShort,
+                };
+            if (filter.oid)
+                where.oid = {
+                    contains: filter.oid,
+                };
+            if (filter.descrizione)
+                where.descrizione = {
+                    contains: filter.descrizione,
+                };
+            if (filter.vendor)
+                where.vendoroid = {
+                    contains: filter.vendor,
+                };
+            const dati = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                }
+            });
+            dati["data"] = Buffer.from(dati["data"]).toString('utf-8');
+            const resp = await prisma.oids.findMany({ where });
+            const jsonData = JSON.parse(dati["data"]);
+            const jsonDataInfo = JSON.parse(dati["datainfo"]);
 
+            for (const oids of resp) {
 
+                if (jsonData[oids.oid] != null) {
+                  //  oids.present = jsonDataInfo[oids.oid];
+                    oids.present =  jsonData[oids.oid] != "exclude";
+                    oids.exclude = jsonData[oids.oid] == "exclude";
+                    oids.forced = jsonData[oids.oid] == "forced";
+                    oids.origin = jsonData[oids.oid];
+                } else {
+                    oids.present =  false;
+                }
+            }
+        console.log(resp);
+            res.render('partials/mfp-queryoids-table.ejs', { oidsList: resp });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send(error);
+        }
+    });
+    router.post('/oids/:serial/update', async (req, res) => {
+        const serial = req.params.serial;
+        //const filter = req.query;
+        const customerToken = req.headers.customertoken;
+        try {
+            const body = await req.body;
+
+            const dati = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                },
+                select: {
+                    data: true
+                }
+            });
+            dati["data"] = Buffer.from(dati["data"]).toString('utf-8');
+            dati["data"] = JSON.parse(dati["data"]);
+            dati["data"][body.oid] = body.id;
+
+            dati["data"] = JSON.stringify(dati["data"]);
+            dati["data"] = Buffer.from(dati["data"]).toString("base64");
+            const cdati = await prisma.dati.update({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                },
+                data: {
+                    data: dati.data
+                }
+            });
+            console.log(cdati);
+            res.send(cdati);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send(error);
+        }
+    });
 
     // GET maintenace data of  :serial
     router.get('/api/mfp/:serial/maintenance', async (req, res) => {
@@ -182,6 +277,69 @@ module.exports = function (prisma, sessions_Data) {
             res.status(500).send('Errore aggiornamento controlli');
         }
     });
+
+
+    // GET oids data of  :serial
+    router.get('/api/mfp/:serial/oids', async (req, res) => {
+        try {
+            let userCookie = req.cookies['X-Custom-Context'];
+            if (!userCookie || !sessions_Data[userCookie]) {
+                console.log('Errore:Ivalid cookie:' + userCookie);
+                res.status(404).send("Invalid coookie:" + userCookie);
+                return;
+            }
+
+            const tokenI = req.headers["customertoken"];// Buffer.from(req.headers["customertoken"], 'base64').toString();
+            const serial = req.params.serial;
+            const dataInfo = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: tokenI
+                    }
+                },
+                select: { serial: true, datainfo: true }
+            });
+            /*
+            const jdati = JSON.parse(d.datainfo)
+                            const oids = Object.keys(jdati);
+                            const completa = await prisma.oids.findMany({
+                                where: { oid: { in: oids } },
+                            });
+            
+                            completa.forEach(item => {
+                                if (jdati[item.oid]) {
+                                    jdati[item.oid] = {
+                                        ...jdati[item.oid], // mantiene proprietà esistenti
+                                        ...item                  // oppure fai merge dei campi: ...item
+                                    };
+                                }
+                            });
+            */
+            if (!dataInfo) return res.status(404).send('dataInfo non trovato:' + serial);
+
+            dataInfo["datainfo"] = JSON.parse(Buffer.from(dataInfo["datainfo"]).toString('utf-8'));
+            const jdati = dataInfo["datainfo"];
+            const oids = Object.keys(jdati);
+            const completa = await prisma.oids.findMany({
+                where: { oid: { in: oids } },
+            });
+
+            completa.forEach(item => {
+                if (jdati[item.oid]) {
+                    jdati[item.oid] = {
+                        ...jdati[item.oid], // mantiene proprietà esistenti
+                        ...item                  // oppure fai merge dei campi: ...item
+                    };
+                }
+            });
+            res.render('partials/mfp-tab-info.ejs', { mfp: dataInfo });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Errore aggiornamento controlli');
+        }
+    });
+
 
     // GET maintenace data of  :serial
     router.get('/api/mfp/:serial/info', async (req, res) => {
@@ -308,18 +466,38 @@ module.exports = function (prisma, sessions_Data) {
                 return;
             }
             const actions = await prisma.hosts.findUnique({
-                where: { token: token, "customerID": req.headers["customertoken"] },
+                where: { token: token },
                 select: { crawler: true },
             });
             const crawler = JSON.parse(actions["crawler"]);
-            crawler[action] = value;
+
+            if (action == 'resetHost') {
+                const re = await prisma.hosts.update({
+                    where: { token: token, "customerID": req.headers["customertoken"] },
+                    data: { knownhosts: Buffer.from("[]").toString("base64") },
+                });
+
+                const rd = await prisma.dati.deleteMany({
+                    where: {                
+                        token: req.headers["customertoken"]
+                    },
+                });
+                //      prisma.dati.update({
+                //         where: { token: token, "customerID": req.headers["customertoken"] },
+                //        data: { knownhosts: JSON.stringify([]) },
+                //   });
+                crawler.resetHost = "off";
+                console.log(re);
+            } else {
+                crawler[action] = value;
+            }
             if (action == "queryoids") {
                 crawler["queryoidsAction"] = "once";
                 crawler["queryoidsIPv4"] = req.body["ipv4"];
                 crawler["queryoidsSerial"] = req.body["serial"];
             }
             const newvalue = await prisma.hosts.update({
-                where: { token: token, "customerID": req.headers["customertoken"] },
+                where: { token: token },
                 data: { crawler: JSON.stringify(crawler) },
             });
             res.status(201).json({ success: true, value: newvalue });

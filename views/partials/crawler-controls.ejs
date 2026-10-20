@@ -5,69 +5,103 @@
         </h6>
     </div>
 
-    <% 
-    function getStatus(val) { 
-        if (!val) return 'OFF'; 
-        const normalized = String(val).toLowerCase().trim(); 
-            
-        if (normalized === 'true' || normalized === 'on') return 'ON'; 
-        if (normalized === 'once') return 'ONCE'; 
-        if (normalized === 'send.once') return 'ONCE'; 
-        if (normalized === 'running.once') return 'ONCE'; 
-        if (normalized === 'running.true') return 'ON'; 
-        return 'OFF'; 
-    } 
+    <% function getStatus(val) { if (!val) return 'OFF' ; const normalized=String(val).toLowerCase().trim(); if
+        (normalized==='true' || normalized==='on' ) return 'ON' ; if (normalized==='once' ) return 'ONCE' ; if
+        (normalized==='send.once' ) return 'ONCE' ; if (normalized==='running.once' ) return 'ONCE' ; if
+        (normalized==='running.true' ) return 'ON' ; return 'OFF' ; } %>
 
-    
-    %>
+        <div class="col-md-12 d-flex flex-wrap gap-3 align-items-center">
 
-    <div class="col-md-12 d-flex flex-wrap gap-3 align-items-center" >
-        <!-- Find New Hosts -->
-        <% 
           
-        let stFind = getStatus(host.crawler ? host.crawler.findNewHosts : null);
-       
-         %>
-        <div class="d-flex align-items-center bg-white p-2 rounded border">
-            <span class="me-2 small fw-bold">Find New Hosts:</span>
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn crawler-btn <%= stFind === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="findNewHosts" data-value="send.true">ON</button>
-                <button type="button" class="btn crawler-btn <%= stFind === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="findNewHosts" data-value="send.false">OFF</button>
-                <button type="button" class="btn crawler-btn <%= stFind === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="findNewHosts" data-value="send.once">ONCE <%= stFind %> </button>
+          
+          
+            <div class="d-flex align-items-center bg-white p-2 rounded border">
+                <span class="me-2 small fw-bold">Reset Host:</span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button"
+                        class="btn crawler-btn btn-outline-secondary"
+                        data-token="<%= host.token %>" data-action="resetHost" data-value="send.reset">RESET</button>                    
+                </div>
             </div>
-        </div>
 
-        <!-- Force Resend -->
-        <% let stForce = getStatus(host.crawler ? host.crawler.forceResend : null); %>
-        <div class="d-flex align-items-center bg-white p-2 rounded border">
-            <span class="me-2 small fw-bold">Force Resend:</span>
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn crawler-btn <%= stForce === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="forceResend" data-value="true">ON</button>
-                <button type="button" class="btn crawler-btn <%= stForce === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="forceResend" data-value="false">OFF</button>
-                <button type="button" class="btn crawler-btn <%= stForce === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="forceResend" data-value="once">ONCE</button>
-            </div>
-        </div>
 
-         <!-- Refresh VALUES -->
-        <% let stOid = getStatus(host.crawler ? host.crawler.refreshvalues : null); %>
-        <div class="d-flex align-items-center bg-white p-2 rounded border">
-            <span class="me-2 small fw-bold">Values:</span>
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn crawler-btn <%= stOid === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshvalues" data-value="send.true">ON</button>
-                <button type="button" class="btn crawler-btn <%= stOid === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshvalues" data-value="send.false">OFF</button>
-                <button type="button" class="btn crawler-btn <%= stOid === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshvalues" data-value="send.once">ONCE</button>
-            </div>
-        </div>
 
-        <!-- Refresh OIDs -->
-        <% stOid = getStatus(host.crawler ? host.crawler.refreshoids : null); %>
-        <div class="d-flex align-items-center bg-white p-2 rounded border">
-            <span class="me-2 small fw-bold">OIDs:</span>
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn crawler-btn <%= stOid === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshoids" data-value="send.true">ON</button>
-                <button type="button" class="btn crawler-btn <%= stOid === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshoids" data-value="send.false">OFF</button>
-                <button type="button" class="btn crawler-btn <%= stOid === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>" data-token="<%= host.token %>" data-action="refreshoids" data-value="send.once">ONCE</button>
-            </div>
+            <!-- Find New Hosts -->
+            <% let stFind=getStatus(host.crawler ? host.crawler.findNewHosts : null); %>
+
+
+                <div class="d-flex align-items-center bg-white p-2 rounded border">
+                    <span class="me-2 small fw-bold">Find New Hosts:</span>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button"
+                            class="btn crawler-btn <%= stFind === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>"
+                            data-token="<%= host.token %>" data-action="findNewHosts" data-value="send.true">ON</button>
+                        <button type="button"
+                            class="btn crawler-btn <%= stFind === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>"
+                            data-token="<%= host.token %>" data-action="findNewHosts"
+                            data-value="send.false">OFF</button>
+                        <button type="button"
+                            class="btn crawler-btn <%= stFind === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>"
+                            data-token="<%= host.token %>" data-action="findNewHosts" data-value="send.once">ONCE <%=
+                                stFind %> </button>
+                    </div>
+                </div>
+
+                <!-- Force Resend -->
+                <% let stForce=getStatus(host.crawler ? host.crawler.forceResend : null); %>
+                    <div class="d-flex align-items-center bg-white p-2 rounded border">
+                        <span class="me-2 small fw-bold">Force Resend:</span>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button"
+                                class="btn crawler-btn <%= stForce === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>"
+                                data-token="<%= host.token %>" data-action="forceResend" data-value="true">ON</button>
+                            <button type="button"
+                                class="btn crawler-btn <%= stForce === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>"
+                                data-token="<%= host.token %>" data-action="forceResend" data-value="false">OFF</button>
+                            <button type="button"
+                                class="btn crawler-btn <%= stForce === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>"
+                                data-token="<%= host.token %>" data-action="forceResend" data-value="once">ONCE</button>
+                        </div>
+                    </div>
+
+                    <!-- Refresh VALUES -->
+                    <% let stOid=getStatus(host.crawler ? host.crawler.refreshvalues : null); %>
+                        <div class="d-flex align-items-center bg-white p-2 rounded border">
+                            <span class="me-2 small fw-bold">Values:</span>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button"
+                                    class="btn crawler-btn <%= stOid === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>"
+                                    data-token="<%= host.token %>" data-action="refreshvalues"
+                                    data-value="send.true">ON</button>
+                                <button type="button"
+                                    class="btn crawler-btn <%= stOid === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>"
+                                    data-token="<%= host.token %>" data-action="refreshvalues"
+                                    data-value="send.false">OFF</button>
+                                <button type="button"
+                                    class="btn crawler-btn <%= stOid === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>"
+                                    data-token="<%= host.token %>" data-action="refreshvalues"
+                                    data-value="send.once">ONCE</button>
+                            </div>
+                        </div>
+
+                        <!-- Refresh OIDs -->
+                        <% stOid=getStatus(host.crawler ? host.crawler.refreshoids : null); %>
+                            <div class="d-flex align-items-center bg-white p-2 rounded border">
+                                <span class="me-2 small fw-bold">OIDs:</span>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button"
+                                        class="btn crawler-btn <%= stOid === 'ON' ? 'btn-success active' : 'btn-outline-secondary' %>"
+                                        data-token="<%= host.token %>" data-action="refreshoids"
+                                        data-value="send.true">ON</button>
+                                    <button type="button"
+                                        class="btn crawler-btn <%= stOid === 'OFF' ? 'btn-secondary active' : 'btn-outline-secondary' %>"
+                                        data-token="<%= host.token %>" data-action="refreshoids"
+                                        data-value="send.false">OFF</button>
+                                    <button type="button"
+                                        class="btn crawler-btn <%= stOid === 'ONCE' ? 'btn-info text-white active' : 'btn-outline-secondary' %>"
+                                        data-token="<%= host.token %>" data-action="refreshoids"
+                                        data-value="send.once">ONCE</button>
+                                </div>
+                            </div>
         </div>
-    </div>
 </div>

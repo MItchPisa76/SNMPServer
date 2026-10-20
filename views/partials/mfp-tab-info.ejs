@@ -1,9 +1,8 @@
+<h6 class="fw-bold mb-3"><i class="bi bi-card-heading"></i> Informazioni Generali Dispositivo</h6>
 
-    <h6 class="fw-bold mb-3"><i class="bi bi-card-heading"></i> Informazioni Generali Dispositivo</h6>
+<%  
 
-    <%  
-
-    console.log(mfp.datainfo);
+   
     if (mfp.datainfo) { 
          const keys = Object.keys(mfp.datainfo);
          keys.sort( (a,b)=> {
@@ -17,47 +16,49 @@
                 if (mfp.datainfo[b].brandShort == null)
                     return -1;
             }
-            return mfp.datainfo[b].priority -mfp.datainfo[a].priority
+            return mfp.datainfo[a].priority -mfp.datainfo[b].priority
          });
     %>
-            <div class="table-responsive">
-                <table class="table table-sm table-hover table-striped border align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th scope="col" style="width: 25%;">Descrizione</th>
-                            <th scope="col" style="width: 15%;">Brand Short</th>
-                            
-                            <th scope="col" style="width: 15%;">Short</th>                            
-                            <th scope="col" style="width: 25%;">Valore Restituito</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% keys.forEach((key)=> { 
+<div class="table-responsive">
+  <table class="table table-sm table-hover table-striped border align-middle">
+    <thead class="table-light">
+      <tr>
+        <th scope="col" style="width: 25%;">Descrizione</th>
+        <th scope="col" style="width: 15%;">Brand Short</th>
+
+        <th scope="col" style="width: 15%;">Short</th>
+        <th scope="col" style="width: 25%;">Valore Restituito</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% keys.forEach((key)=> { 
                             value = mfp.datainfo[key]
-                            console.log(key,value);                            
+                                                  
                               %>
-                            <tr class="oid-row" data-oid="<%= value.oid %>">
-                                 <td class="oid-desc text-muted" title="<%= value.oid %>">
-                                    <%= value.pretty %>
-                                </td>
-                                <td class="oid-brand text-muted">
-                                    <%= value.brandShort %>
-                                </td>
-                               
-                                <td class="oid-short text-muted">
-                                    <%= value.short %>
-                                </td>
-                             
-                                <td class="text-break"><strong>
-                                        <%= value.value %>
-                                    </strong></td>
-                            </tr>
-                            <% }); %>
-                    </tbody>
-                </table>
-            </div>
-            <% } else { %>
-                <div class="alert alert-light border text-muted small mb-0">
-                    Nessun dato descrittivo disponibile in <code>datainfo</code> per questa stampante.
-                </div>
-                <% } %>
+      <tr class="oid-row" data-oid="<%= value.oid %>">
+        <td class="oid-desc text-muted" title="<%= value.oid %>">
+          <%= value.pretty %>
+        </td>
+        <td class="oid-brand text-muted">
+          <%= value.brandShort %>
+        </td>
+
+        <td class="oid-short text-muted">
+          <%= value.short %>
+        </td>
+
+        <td class="text-break">
+          <strong>
+            <%= value.value %>
+          </strong>
+        </td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<% } else { %>
+<div class="alert alert-light border text-muted small mb-0">
+  Nessun dato descrittivo disponibile in <code>datainfo</code> per questa stampante.
+</div>
+<% } %>

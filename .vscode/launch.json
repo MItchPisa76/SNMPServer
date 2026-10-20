@@ -6,7 +6,12 @@
       "request": "launch",
       "name": "Avvia Server Node v23",
       "program": "${workspaceFolder}/server.js",
-      "runtimeExecutable": "/home/mitch/.nvm/versions/node/v24.20.0/bin/node"
+      "restart":true,
+      "runtimeExecutable": "/home/mitch/.nvm/versions/node/v24.20.0/bin/node",
+      "runtimeArgs": [
+        "--watch",
+        "--inspect=9229"
+      ],
     }
   ]
 }
