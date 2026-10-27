@@ -1,66 +1,66 @@
 <% if (oidsList && oidsList.length > 0) { %>
-    <% oidsList.forEach(item => {
+<% oidsList.forEach(item => {
         const currentMode = item.mode !== null ? item.mode : 0;
         const hasBit1 = (currentMode & 1) === 1;
         const hasBit2 = (currentMode & 2) === 2;
-console.log(item);
+
         // Determina lo stato iniziale per il tri-state:
         // 'esonera' (se esonera === true), 'present' (se present === true e non esonera), altrimenti 'ignora'
         const state = item.exclude ? 'exclude' : item.forced?'forced':(item.present ? 'present' : 'ignore');
         const pstate = (item.origin === 'no') || (item.origin === 'null');
         %>
-        <tr data-id="<%= item.id %>" data-oid="<%= item.oid %>" class="<%= state === 'esonera' ? 'table-secondary text-muted' : '' %>">
-            <td><code><%= item.oid %></code></td>
-            <td><input type="text" class="form-control form-control-sm f-short" value="<%= item.short || '' %>"></td>
-            <td><input type="text" class="form-control form-control-sm f-brandShort" value="<%= item.brandShort || '' %>"></td>
-            <td><input type="text" class="form-control form-control-sm f-descrizione" value="<%= item.descrizione || '' %>"></td>
-            <td><input type="text" class="form-control form-control-sm f-vendor" value="<%= item.vendoroid || '' %>"></td>
-            <td><input type="text" class="form-control form-control-sm f-origin" value="<%= item.origin || 'aa' %>" disabled></td>
-            <td><input type="number" class="form-control form-control-sm f-priority" value="<%= item.priority %>"></td>
-            <td class="text-center align-middle">
-                <div class="d-flex justify-content-center gap-2 flex-wrap align-items-center">
-                    <div class="form-check me-1" title="Bit 1 (& 1)">
-                        <input class="form-check-input f-mode-bit1" type="checkbox" <%= hasBit1 ? 'checked' : '' %>>
-                        <label class="form-check-label small">forced</label>
-                    </div>
-                    <div class="form-check me-2" title="Bit 2 (& 2)">
-                        <input class="form-check-input f-mode-bit2" type="checkbox" <%= hasBit2 ? 'checked' : '' %>>
-                        <label class="form-check-label small">walk</label>
-                    </div>
+<tr data-id="<%= item.id %>" data-oid="<%= item.oid %>" class="<%= state === 'esonera' ? 'table-secondary text-muted' : '' %>">
+  <td><code><%= item.oid %></code></td>
+  <td><input type="text" class="form-control form-control-sm f-short" value="<%= item.short || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-brandShort" value="<%= item.brandShort || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-descrizione" value="<%= item.descrizione || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-vendor" value="<%= item.vendoroid || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-origin" value="<%= item.origin || 'aa' %>" disabled></td>
+  <td><input type="number" class="form-control form-control-sm f-priority" value="<%= item.priority %>"></td>
+  <td class="text-center align-middle">
+    <div class="d-flex justify-content-center gap-2 flex-wrap align-items-center">
+      <div class="form-check me-1" title="Bit 1 (& 1)">
+        <input class="form-check-input f-mode-bit1" type="checkbox" <%= hasBit1 ? 'checked' : '' %>>
+        <label class="form-check-label small">forced</label>
+      </div>
+      <div class="form-check me-2" title="Bit 2 (& 2)">
+        <input class="form-check-input f-mode-bit2" type="checkbox" <%= hasBit2 ? 'checked' : '' %>>
+        <label class="form-check-label small">walk</label>
+      </div>
 
-                    <!-- Tri-State Segmented Control: Presente / Ignora / Esonera -->
-                    <div class="btn-group btn-group-sm oid-status-tributton" role="group" aria-label="Stato OID" data-oid="<%= item.oid%>">                        
-                        <label class="btn <%= pstate? 'btn-outline-warning':'btn-outline-success' %> btn-sm py-0 px-2 <%= state === 'present' ? 'active' : '' %>" data-name="status-present-<%= item.id %>" title="Presente" data-value="present">Presente</label>                   
-                        <label class="btn btn-outline-warning btn-sm py-0 px-2 <%= state === 'forced' ? 'active' : '' %> " data-name="status-forced-<%= item.id %>" title="Forced" data-value ="forced">Forced</label>
-                        <label class="btn btn-outline-secondary btn-sm py-0 px-2 <%= state === 'ignore' ? 'active' : '' %> " data-name="status-ignore-<%= item.id %>" title="Ignora" data-value ="ignore">Ignora</label>
-                        <label class="btn btn-outline-danger btn-sm py-0 px-2 <%= state === 'exclude' ? 'active' : '' %> " data-name="status-exclude-<%= item.id %>" title="Exclude" data-value ="exclude">Exclude</label>                                                
-                    </div>
-                </div>
-            </td>
-            <td class="text-end">
-                <div class="btn-group btn-group-sm" role="group">
-                    <button class="btn btn-outline-info btn-refresh-oid" title="Richiedi o rinfresca OID sul client attivo">
-                        <i class="bi bi-arrow-repeat"></i> Richiedi/Rinfresca
-                    </button>
-                    <button class="btn btn-success btn-save-oid" title="Salva modifiche">
-                        <i class="bi bi-check-lg"></i> Salva
-                    </button>
-                </div>
-            </td>
-        </tr>
-        <!-- Risultati della richiesta OID -->
-        <tr id="result-row-<%= item.id %>" class="d-none table-info">
-            <td colspan="8">
-                <div class="d-flex align-middle align-items-center gap-2 small">
-                    <strong>Risultato Richiesta:</strong>
-                    <span class="oid-result-value badge bg-dark text-wrap text-break">--</span>
-                    <span class="oid-result-time text-muted ms-auto"></span>
-                </div>
-            </td>
-        </tr>
-        <% }); %>
+      <!-- Tri-State Segmented Control: Presente / Ignora / Esonera -->
+      <div class="btn-group btn-group-sm oid-status-tributton" role="group" aria-label="Stato OID" data-oid="<%= item.oid%>">
+        <label class="btn <%= pstate? 'btn-outline-warning':'btn-outline-success' %> btn-sm py-0 px-2 <%= state === 'present' ? 'active' : '' %>" data-name="status-present-<%= item.id %>" title="Presente" data-value="present">Presente</label>
+        <label class="btn btn-outline-warning btn-sm py-0 px-2 <%= state === 'forced' ? 'active' : '' %> " data-name="status-forced-<%= item.id %>" title="Forced" data-value="forced">Forced</label>
+        <label class="btn btn-outline-secondary btn-sm py-0 px-2 <%= state === 'ignore' ? 'active' : '' %> " data-name="status-ignore-<%= item.id %>" title="Ignora" data-value="ignore">Ignora</label>
+        <label class="btn btn-outline-danger btn-sm py-0 px-2 <%= state === 'exclude' ? 'active' : '' %> " data-name="status-exclude-<%= item.id %>" title="Exclude" data-value="exclude">Exclude</label>
+      </div>
+    </div>
+  </td>
+  <td class="text-end">
+    <div class="btn-group btn-group-sm" role="group">
+      <button class="btn btn-outline-info btn-refresh-oid" title="Richiedi o rinfresca OID sul client attivo">
+        <i class="bi bi-arrow-repeat"></i> Richiedi/Rinfresca
+      </button>
+      <button class="btn btn-success btn-save-oid" title="Salva modifiche">
+        <i class="bi bi-check-lg"></i> Salva
+      </button>
+    </div>
+  </td>
+</tr>
+<!-- Risultati della richiesta OID -->
+<tr id="result-row-<%= item.id %>" class="d-none table-info">
+  <td colspan="8">
+    <div class="d-flex align-middle align-items-center gap-2 small">
+      <strong>Risultato Richiesta:</strong>
+      <span class="oid-result-value badge bg-dark text-wrap text-break">--</span>
+      <span class="oid-result-time text-muted ms-auto"></span>
+    </div>
+  </td>
+</tr>
+<% }); %>
 <% } else { %>
-    <tr>
-        <td colspan="8" class="text-center text-muted">Nessun OID presente</td>
-    </tr>
+<tr>
+  <td colspan="8" class="text-center text-muted">Nessun OID presente</td>
+</tr>
 <% } %>

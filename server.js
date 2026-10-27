@@ -25,6 +25,7 @@ const sslOptions = {
 };
 
 const sessions_Data = [];
+const snmpQueries = [];
 
 // Configurazione App Dashboard
 app.set('view engine', 'ejs');
@@ -34,7 +35,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Inclusione dei Moduli Esterni
-const appRoutes = require('./routes/app')(prisma, sessions_Data);
+const appRoutes = require('./routes/app')(prisma, sessions_Data, snmpQueries);
 const githubRoutes = require('./routes/github')(sessions_Data, prisma, sslOptions);
 
 app.use('/', appRoutes);
@@ -43,8 +44,10 @@ app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
 
 // Configurazione Server Dati (Ingestion MFP/Hosts)
 server.set('json', path.join(__dirname, 'json'));
-server.use(express.json());
+
 server.use(express.static(path.join(__dirname, 'json')));
+server.use(express.json({ limit: '90mb' }));
+server.use(express.urlencoded({ limit: '90mb', extended: true }));
 
 server.post('/mfp', async (req, res) => {
     try {
@@ -74,16 +77,45 @@ server.post('/mfp', async (req, res) => {
         if (serial == null) {
             serial = "unkown";
         }
-        if (map.removetempserial != null) {
-            const nuovoToken = await prisma.dati.delete({
-                where: {
-                    serial_token: {
-                        serial: map.removetempserial,
-                        token: tokenI
-                    }
+        if (map.query) {
+
+            for (const q in map.query) {
+                if (map.query[q]) {
+                    console.log("query:", q, map.query[q]);
+                    if (!snmpQueries[serial])
+                        snmpQueries[serial] = {};
+                    if (snmpQueries[serial][q])
+                        console.log("   updated:" + q);
+                    else
+                        console.log("   created" + q);
+                    snmpQueries[serial][q] = map.query[q];
+
+
+                    continue;
                 }
-            });
-            console.log("removed:",nuovoToken);
+
+                console.log("***", q);
+            }
+
+
+
+
+        }
+        if (map.removetempserial != null) {
+            try {
+                const nuovoToken = await prisma.dati.delete({
+                    where: {
+                        serial_token: {
+                            serial: map.removetempserial,
+                            token: tokenI
+                        }
+                    }
+                });
+                console.log("removed:", nuovoToken);
+            } catch (error) {
+                console.log(map, tokenI);
+                console.error(error);
+            }
         }
 
 
@@ -115,7 +147,7 @@ server.post('/mfp', async (req, res) => {
                     const oldJson = JSON.parse(oldJsonStr);
                     for (const o in oldJson) {
                         if (oldJson[o] != "exclude") {
-                            if (oldJson[o] == "forced") {
+                            if ((oldJson[o] == "forced") || (oldJson[o] != null && oldJson[o].startsWith("walk:"))) {
                             } else {
                                 oldJson[o] = "ghost";
                             }
@@ -206,7 +238,7 @@ server.post('/options', async (req, res) => {
 
         const localData = req.body["localData"];
         delete req.body["localData"];
-        const ldo = JSON.parse(localData);
+        const ldo = localData;
 
         if (token === "PLEASE") {
             req.body["hostToken"] = crypto.randomBytes(32).toString('hex');
@@ -218,7 +250,7 @@ server.post('/options', async (req, res) => {
                 token: req.body["hostToken"],
                 "customerID": customerToken,
                 options: optionsBuffer,
-                "IPV4": localData,
+                "IPV4": JSON.stringify(localData),
             };
             const nuovoToken = await prisma.hosts.create({
                 data
@@ -264,8 +296,12 @@ server.get('/knownhosts', async (req, res) => {
             select: { knownhosts: true },
         });
 
-        const kh = nuovoToken["knownhosts"] ? Buffer.from(nuovoToken["knownhosts"], 'base64').toString() : {};
-        res.send(kh);
+        if (nuovoToken) {
+            const kh = nuovoToken["knownhosts"] ? Buffer.from(nuovoToken["knownhosts"], 'base64').toString() : [];
+            res.send(kh);
+        } else {
+            res.send([]);
+        }
     } catch (error) {
         console.error(req.headers, error);
         res.status(500).send(error);
@@ -340,15 +376,20 @@ server.get('/remote', async (req, res) => {
             select: { crawler: true },
         });
 
-        const crawler = JSON.parse(nuovoToken.crawler);
-        crawler.lastOnline = new Date();
+        if (nuovoToken) {
+            const crawler = JSON.parse(nuovoToken.crawler);
+            if (crawler) {
+                crawler.lastOnline = new Date();
 
-        await prisma.hosts.update({
-            where: { token: token, "customerID": tokenI },
-            data: { crawler: JSON.stringify(crawler) },
-        });
-
-        res.send(nuovoToken);
+                await prisma.hosts.update({
+                    where: { token: token, "customerID": tokenI },
+                    data: { crawler: JSON.stringify(crawler) },
+                });
+            }
+            res.send(nuovoToken);
+        } else {
+            res.status(400).send("nuovoTOken-Error");
+        }
     } catch (error) {
         console.error(req.headers, error);
         res.status(500).send(error);
@@ -381,7 +422,7 @@ server.get('/oids/vendor/:vendor', async (req, res) => {
 
 
         let data = [];
-        if (filterDati) {
+        if (filterDati && filterDati.data) {
             const dataStr = Buffer.from(filterDati.data, 'base64').toString();
             const dataJSON = JSON.parse(dataStr);
             for (const d in dataJSON) {

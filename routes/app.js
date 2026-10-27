@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 
-module.exports = function (prisma, sessions_Data) {
+module.exports = function (prisma, sessions_Data, snmpQueries) {
     // 1. ROTTA PAGINA INIZIALE
     router.get('/', async (req, res) => {
         try {
@@ -71,7 +71,7 @@ module.exports = function (prisma, sessions_Data) {
         try {
             let userCookie = req.cookies['X-Custom-Context'];
             if (!userCookie || !sessions_Data[userCookie]) {
-                console.log('Errore:Ivalid cookie:' + userCookie);
+                console.error('Errore:Ivalid cookie:' + userCookie);
                 res.status(404).send("Invalid coookie:" + userCookie);
                 return;
             }
@@ -91,16 +91,11 @@ module.exports = function (prisma, sessions_Data) {
                 const json = JSON.parse(d.lastUpdates);
 
                 if (lastUpdates[serial]) {
-                    if (json.lastUpdatedAlert == lastUpdates[serial].lastUpdatedAlert) {
-                        delete json["lastUpdatedAlert"];
-                    }
-                    if (json.lastUpdatedMaintenance == lastUpdates[serial].lastUpdatedMaintenance) {
-                        delete json.lastUpdatedMaintenance;
-                    }
-                    if (json.lastUpdatedInfo == lastUpdates[serial].lastUpdatedInfo) {
-                        delete json.lastUpdatedInfo;
-                    } else {
-                        console.log("json.lastUpdatedInfo:", json.lastUpdatedInfo);
+                    for (const lu in lastUpdates[serial]) {
+                        if (lu.startsWith("last"))
+                            if ((json[lu]) && (json[lu] == lastUpdates[serial][lu])) {
+                                delete json[lu];
+                            }
                     }
                 }
 
@@ -185,25 +180,73 @@ module.exports = function (prisma, sessions_Data) {
             const jsonData = JSON.parse(dati["data"]);
             const jsonDataInfo = JSON.parse(dati["datainfo"]);
 
-            for (const oids of resp) {
+            const first = req.headers["from"];
+            const countR = req.headers["count"];
+
+
+            const pageResp = resp.slice(first, first + countR);
+
+            for (const oids of pageResp) {
 
                 if (jsonData[oids.oid] != null) {
-                  //  oids.present = jsonDataInfo[oids.oid];
-                    oids.present =  jsonData[oids.oid] != "exclude";
+                    //  oids.present = jsonDataInfo[oids.oid];
+                    oids.present = jsonData[oids.oid] != "exclude";
                     oids.exclude = jsonData[oids.oid] == "exclude";
                     oids.forced = jsonData[oids.oid] == "forced";
                     oids.origin = jsonData[oids.oid];
                 } else {
-                    oids.present =  false;
+                    oids.present = false;
                 }
             }
-        console.log(resp);
-            res.render('partials/mfp-queryoids-table.ejs', { oidsList: resp });
+            console.log(pageResp);
+            res.render('partials/mfp-queryoids-table.ejs', { oidsList: pageResp });
         } catch (error) {
             console.error(error);
             res.status(500).send(error);
         }
     });
+    router.post('/oids/:serial/walk/:baseoid', async (req, res) => {
+        try {
+            const serial = req.params.serial;
+            const baseoid = req.params.baseoid;
+            //const filter = req.query;
+            const customerToken = req.headers.customertoken;
+            let userCookie = req.cookies['X-Custom-Context'];
+
+            const dati = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                },
+                select: {
+                    data: true
+                }
+            });
+            dati["data"] = Buffer.from(dati["data"]).toString('utf-8');
+            dati["data"] = JSON.parse(dati["data"]);
+            dati["data"][baseoid] = "walk:" + userCookie;
+            dati["data"] = JSON.stringify(dati["data"]);
+            dati["data"] = Buffer.from(dati["data"]).toString("base64");
+            const cdati = await prisma.dati.update({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                },
+                data: {
+                    data: dati.data
+                }
+            });
+            console.log(cdati);
+        } catch (error) {
+            console.log(error);
+        }
+        res.send({});
+    });
+
     router.post('/oids/:serial/update', async (req, res) => {
         const serial = req.params.serial;
         //const filter = req.query;
@@ -222,6 +265,7 @@ module.exports = function (prisma, sessions_Data) {
                     data: true
                 }
             });
+
             dati["data"] = Buffer.from(dati["data"]).toString('utf-8');
             dati["data"] = JSON.parse(dati["data"]);
             dati["data"][body.oid] = body.id;
@@ -239,7 +283,7 @@ module.exports = function (prisma, sessions_Data) {
                     data: dati.data
                 }
             });
-            console.log(cdati);
+            //   console.log(cdati);
             res.send(cdati);
         } catch (error) {
             console.error(error);
@@ -280,7 +324,7 @@ module.exports = function (prisma, sessions_Data) {
 
 
     // GET oids data of  :serial
-    router.get('/api/mfp/:serial/oids', async (req, res) => {
+    router.get('/api/mfp/:serial/oids/list', async (req, res) => {  //DEPRECRATEF
         try {
             let userCookie = req.cookies['X-Custom-Context'];
             if (!userCookie || !sessions_Data[userCookie]) {
@@ -300,22 +344,7 @@ module.exports = function (prisma, sessions_Data) {
                 },
                 select: { serial: true, datainfo: true }
             });
-            /*
-            const jdati = JSON.parse(d.datainfo)
-                            const oids = Object.keys(jdati);
-                            const completa = await prisma.oids.findMany({
-                                where: { oid: { in: oids } },
-                            });
-            
-                            completa.forEach(item => {
-                                if (jdati[item.oid]) {
-                                    jdati[item.oid] = {
-                                        ...jdati[item.oid], // mantiene proprietà esistenti
-                                        ...item                  // oppure fai merge dei campi: ...item
-                                    };
-                                }
-                            });
-            */
+
             if (!dataInfo) return res.status(404).send('dataInfo non trovato:' + serial);
 
             dataInfo["datainfo"] = JSON.parse(Buffer.from(dataInfo["datainfo"]).toString('utf-8'));
@@ -339,6 +368,148 @@ module.exports = function (prisma, sessions_Data) {
             res.status(500).send('Errore aggiornamento controlli');
         }
     });
+
+    router.get('/api/mfp/:serial/oids/active', async (req, res) => {
+        let userCookie = req.cookies['X-Custom-Context'];
+        if (!userCookie || !sessions_Data[userCookie]) {
+            console.log('Errore:Ivalid cookie:' + userCookie);
+            res.status(404).send("Invalid coookie:" + userCookie);
+            return;
+        }
+        const serial = req.params.serial;
+
+        const queryData = snmpQueries[serial];
+        if (queryData == null) {
+            res.status(404).send("no query data:" + serial);
+            return;            
+        }
+        const qArray = [];
+        for (const qqq in queryData) {
+            const qq = queryData[qqq];
+            qArray.push({id:qq.oid, tot : Object.keys(qq.value).length})
+        }
+        res.render('partials/mfp-queryoids-activequeries.ejs', { items: qArray ?? {} });
+    });
+    router.get('/api/mfp/:serial/oids/query', async (req, res) => {
+        try {
+            let userCookie = req.cookies['X-Custom-Context'];
+            if (!userCookie || !sessions_Data[userCookie]) {
+                console.log('Errore:Ivalid cookie:' + userCookie);
+                res.status(404).send("Invalid coookie:" + userCookie);
+                return;
+            }
+            const customerToken = req.headers["customertoken"];// Buffer.from(req.headers["customertoken"], 'base64').toString();
+            const serial = req.params.serial;
+            if (req.query.oid) {
+                console.log(req.query);
+            }
+            const queryData = snmpQueries[serial];
+            if (queryData == null) {
+                const actions = await prisma.hosts.findMany({
+                    where: { customerID: customerToken },
+                    select: { token:true,crawler: true },
+                });
+                for (const action of actions) {
+                    const crawler = JSON.parse(action["crawler"]);
+                    crawler.updateCookie = "sendUpdateCookie";
+                    const newvalue = await prisma.hosts.update({
+                        where: { token: action["token"] },
+                        data: { crawler: JSON.stringify(crawler) },
+                    });
+                    // action["crawler"] = JSON.stringify(crawler);
+                }
+
+                console.error("QueryData==null");
+                res.status(500).send();
+                return;
+            }
+
+            if (queryData == {}) {
+                res.status(500);
+                return;
+            }
+
+            const dati = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                }
+            });
+            dati["data"] = Buffer.from(dati["data"]).toString('utf-8');
+            const jsonData = JSON.parse(dati["data"]);
+            // const jsonDataInfo = JSON.parse(dati["datainfo"]);
+            const qArray = [];
+            let count = 0;
+            const first = req.headers["from"];
+            let countR = req.headers["count"];
+
+            for (const o in queryData) {
+                count++;
+                if (count <= first)
+                    continue;
+                countR--;
+                const oids = queryData[o];
+                if (jsonData[oids.oid] != null) {
+                    //  oids.present = jsonDataInfo[oids.oid];
+                    oids.present = jsonData[oids.oid] != "exclude";
+                    oids.exclude = jsonData[oids.oid] == "exclude";
+                    oids.forced = jsonData[oids.oid] == "forced";
+                    oids.origin = jsonData[oids.oid];
+                } else {
+                    oids.present = false;
+                }
+                qArray.push(oids);
+                if (countR <= 0)
+                    break;
+            }
+            console.log(queryData);
+            res.render('partials/mfp-queryoids-table.ejs', { oidsList: qArray });
+
+
+
+
+
+
+            return;
+            res.render('partials/mfp-queryoids-table.ejs', { oidsList: resp });
+            return;
+
+            const dataInfo = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: tokenI
+                    }
+                },
+                select: { serial: true, datainfo: true }
+            });
+
+            if (!dataInfo) return res.status(404).send('dataInfo non trovato:' + serial);
+
+            dataInfo["datainfo"] = JSON.parse(Buffer.from(dataInfo["datainfo"]).toString('utf-8'));
+            const jdati = dataInfo["datainfo"];
+            const oids = Object.keys(jdati);
+            const completa = await prisma.oids.findMany({
+                where: { oid: { in: oids } },
+            });
+
+            completa.forEach(item => {
+                if (jdati[item.oid]) {
+                    jdati[item.oid] = {
+                        ...jdati[item.oid], // mantiene proprietà esistenti
+                        ...item                  // oppure fai merge dei campi: ...item
+                    };
+                }
+            });
+            res.render('partials/mfp-tab-info.ejs', { mfp: dataInfo });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Errore aggiornamento controlli');
+        }
+    });
+
 
 
     // GET maintenace data of  :serial
@@ -378,7 +549,8 @@ module.exports = function (prisma, sessions_Data) {
                                 }
                             });
             */
-            if (!dataInfo) return res.status(404).send('dataInfo non trovato:' + serial);
+            if (!dataInfo || !dataInfo["datainfo"])
+                return res.status(404).send('dataInfo non trovato:' + serial);
 
             dataInfo["datainfo"] = JSON.parse(Buffer.from(dataInfo["datainfo"]).toString('utf-8'));
             const jdati = dataInfo["datainfo"];
@@ -478,7 +650,7 @@ module.exports = function (prisma, sessions_Data) {
                 });
 
                 const rd = await prisma.dati.deleteMany({
-                    where: {                
+                    where: {
                         token: req.headers["customertoken"]
                     },
                 });
