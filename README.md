@@ -8,7 +8,7 @@
  npx prisma generate
  
  npx prisma db pull
-# creare chiave SSH
+# creare chiave SSH (Linux)
 
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 
