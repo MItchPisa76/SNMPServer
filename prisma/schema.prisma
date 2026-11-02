@@ -30,6 +30,7 @@ model dati {
   token           String
   data            Bytes?
   lastUpdates     String?
+  idresolver      String?
   customers       customers @relation(fields: [token], references: [tokenI])
 
   @@unique([serial, token])
@@ -55,4 +56,15 @@ model oids {
   priority    Int     @default(-1)
   mode        Int?    @default(0)
   id          Int     @id @unique(map: "sqlite_autoindex_oids_1") @default(autoincrement())
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PrtMarkerSuppliesType {
+  code         Int?
+  mibName      String?
+  description  String?
+  isReceptacle Int?
+  refOid       String?
+
+  @@ignore
 }

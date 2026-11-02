@@ -6,25 +6,34 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
     // 1. ROTTA PAGINA INIZIALE
     router.get('/', async (req, res) => {
         try {
-            const hostsList = await prisma.hosts.findMany({});
             const customers = await prisma.customers.findMany({
                 include: { dati: true, hosts: true },
             });
 
-            for (const r of hostsList) {
-                if (r["IPV4"]) r["IPV4"] = JSON.parse(r["IPV4"]);
-                if (r["crawler"]) r["crawler"] = JSON.parse(r["crawler"]);
-            }
+
 
             for (const customer of customers) {
                 for (const ld of customer.dati) {
                     if (ld["dataalerts"]) ld["dataalerts"] = JSON.parse(Buffer.from(ld["dataalerts"]).toString('utf-8'));
+                    if (ld["idresolver"]) ld["idresolver"] = JSON.parse(Buffer.from(ld["idresolver"]).toString('utf-8'));
                     if (ld["datainfo"]) ld["datainfo"] = JSON.parse(Buffer.from(ld["datainfo"]).toString('utf-8'));
                     if (ld["dataconsumabili"]) ld["dataconsumabili"] = JSON.parse(Buffer.from(ld["dataconsumabili"]).toString('utf-8'));
                 }
                 for (const host of customer.hosts) {
                     if (host["IPV4"]) host["IPV4"] = JSON.parse(host["IPV4"]);
                     if (host["crawler"]) host["crawler"] = JSON.parse(host["crawler"]);
+                    if (host["crawler"]) {
+                        //    host["crawler"] = JSON.parse(host["crawler"]);
+                        for (const hc in host["crawler"]) {
+                            if (hc == "lastOnline")
+                                continue;
+                            try {
+                                host["crawler"][hc] = JSON.parse(host["crawler"][hc]);
+                            } catch (error) {
+                                console.error(host["crawler"][hc], error);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -59,7 +68,7 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
                 //  res.cookie('X-Custom-Context', userCookie);
             }
             delete userData.customers;
-            res.render('index', { hosts: hostsList, customers: customers, userData: userData });
+            res.render('index', { customers: customers, userData: userData });
         } catch (error) {
             console.error(error);
             res.status(500).send("Errore nel caricamento della pagina:" + error);
@@ -205,7 +214,7 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
             res.status(500).send(error);
         }
     });
-    router.post('/oids/:serial/walk/:baseoid', async (req, res) => {
+    router.post('/oids/:serial/walkDept/:baseoid', async (req, res) => {
         try {
             const serial = req.params.serial;
             const baseoid = req.params.baseoid;
@@ -247,6 +256,47 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
         res.send({});
     });
 
+    router.post('/oids/:serial/walk/:baseoid', async (req, res) => {
+        try {
+            const serial = req.params.serial;
+            const baseoid = req.params.baseoid;
+            //const filter = req.query;
+            const customerToken = req.headers.customertoken;
+            let userCookie = req.cookies['X-Custom-Context'];
+
+            const dati = await prisma.dati.findUnique({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                },
+                select: {
+                    data: true
+                }
+            });
+            dati["data"] = Buffer.from(dati["data"]).toString('utf-8');
+            dati["data"] = JSON.parse(dati["data"]);
+            dati["data"][baseoid] = "walk:" + userCookie;
+            dati["data"] = JSON.stringify(dati["data"]);
+            dati["data"] = Buffer.from(dati["data"]).toString("base64");
+            const cdati = await prisma.dati.update({
+                where: {
+                    serial_token: {
+                        serial: serial,
+                        token: customerToken
+                    }
+                },
+                data: {
+                    data: dati.data
+                }
+            });
+            console.log(cdati);
+        } catch (error) {
+            console.log(error);
+        }
+        res.send({});
+    });
     router.post('/oids/:serial/update', async (req, res) => {
         const serial = req.params.serial;
         //const filter = req.query;
@@ -381,12 +431,12 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
         const queryData = snmpQueries[serial];
         if (queryData == null) {
             res.status(404).send("no query data:" + serial);
-            return;            
+            return;
         }
         const qArray = [];
         for (const qqq in queryData) {
             const qq = queryData[qqq];
-            qArray.push({id:qq.oid, tot : Object.keys(qq.value).length})
+            qArray.push({ id: qq.oid, tot: Object.keys(qq.value).length })
         }
         res.render('partials/mfp-queryoids-activequeries.ejs', { items: qArray ?? {} });
     });
@@ -403,15 +453,15 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
             if (req.query.oid) {
                 console.log(req.query);
             }
-            const queryData = snmpQueries[serial];
-            if (queryData == null) {
+            const queryDatas = snmpQueries[serial];
+            if (queryDatas == null) {
                 const actions = await prisma.hosts.findMany({
                     where: { customerID: customerToken },
-                    select: { token:true,crawler: true },
+                    select: { token: true, crawler: true },
                 });
                 for (const action of actions) {
                     const crawler = JSON.parse(action["crawler"]);
-                    crawler.updateCookie = "sendUpdateCookie";
+                    crawler.updateCookie = JSON.stringify({ status: "sendUpdateCookie" });
                     const newvalue = await prisma.hosts.update({
                         where: { token: action["token"] },
                         data: { crawler: JSON.stringify(crawler) },
@@ -419,12 +469,12 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
                     // action["crawler"] = JSON.stringify(crawler);
                 }
 
-                console.error("QueryData==null");
+                console.error("QueryDatas==null");
                 res.status(500).send();
                 return;
             }
 
-            if (queryData == {}) {
+            if (queryDatas == {}) {
                 res.status(500);
                 return;
             }
@@ -444,7 +494,11 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
             let count = 0;
             const first = req.headers["from"];
             let countR = req.headers["count"];
-
+            let walkoid = req.headers["walkoid"];
+            const queryData = queryDatas[walkoid] ? queryDatas[walkoid].value : null;
+            if (walkoid == null) {
+                count = -1
+            }
             for (const o in queryData) {
                 count++;
                 if (count <= first)
@@ -460,11 +514,13 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
                 } else {
                     oids.present = false;
                 }
+                console.log(queryData);
                 qArray.push(oids);
                 if (countR <= 0)
                     break;
             }
-            console.log(queryData);
+
+            console.log(qArray);
             res.render('partials/mfp-queryoids-table.ejs', { oidsList: qArray });
 
 
@@ -619,8 +675,15 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
                 select: { crawler: true, token: true },
             });
             if (!host) return res.status(404).send('Host non trovato:' + token);
-
             host.crawler = JSON.parse(host.crawler);
+            for (const hc in host.crawler) {
+                try {
+                    host.crawler[hc] = JSON.parse(host.crawler[hc]);
+                } catch (error) {
+                    console.error(host.crawler[hc], error);
+                }
+            }
+
             res.render('partials/crawler-controls', { host: host });
         } catch (error) {
             console.error(error);
@@ -658,10 +721,11 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
                 //         where: { token: token, "customerID": req.headers["customertoken"] },
                 //        data: { knownhosts: JSON.stringify([]) },
                 //   });
-                crawler.resetHost = "off";
+                crawler.resetHost = {};
+                crawler.resetHost.status = "off";
                 console.log(re);
             } else {
-                crawler[action] = value;
+                crawler[action] = JSON.stringify({ status: value });
             }
             if (action == "queryoids") {
                 crawler["queryoidsAction"] = "once";

@@ -355,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
         }));
         console.log(params);
+        updateOidsDatalist(OIDDiv.closest("table"));
     }
 
     async function updateOidsQueryPaginator(event) {
@@ -430,6 +431,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (container.classList.contains('active'))
                     container.classList.add('show');
                 walkButton.classList.remove("active", "disabled");
+                const tributtons = container.querySelectorAll('.oid-status-tributton label');
+                for (const b of tributtons) {
+                    b.addEventListener('click', updateOIDStatusEvent);
+                }
             }, 150);
             // Inietta l'HTML aggiornato direttamente nel DOM senza refresh
             //  container.innerHTML = updatedHtml;
@@ -437,8 +442,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             try {
                 // Effettua la chiamata alla rotta partial
-                const response = (await fetch(`/api/mfp/${serial}/oids/query?+query`, {
-                    headers: { "customertoken": tokenCustomer, from: paginatorPage.value, count: paginatorCount.value, walkoid:walkButton.dataset.walkoid }
+                const response = (await fetch(`/api/mfp/${serial}/oids/query?` + query, {
+                    headers: { "customertoken": tokenCustomer, from: paginatorPage.value, count: paginatorCount.value, walkoid: walkButton.dataset.walkoid }
                 }));
 
                 if (!response.ok) {
@@ -458,16 +463,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     container.innerHTML = updatedHtml;
                     if (container.classList.contains('active'))
                         container.classList.add('show');
+                    const tributtons = container.querySelectorAll('.oid-status-tributton label');
+                    for (const b of tributtons) {
+                        b.addEventListener('click', updateOIDStatusEvent);
+                    }
                 }, 150);
 
             } catch (error) {
                 console.error(`Errore durante il refresh dell'mfp query ${serial}:`, error);
             }
         }
-        const tributtons = container.querySelectorAll('.oid-status-tributton label');
-        for (const b of tributtons) {
-            b.addEventListener('click', updateOIDStatusEvent);
-        }
+
 
 
         const listButtonsH = containerH.querySelectorAll('button');

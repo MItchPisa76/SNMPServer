@@ -103,6 +103,7 @@ server.post('/mfp', async (req, res) => {
         }
         if (map.removetempserial != null) {
             try {
+                console.log("remove:", map.removetempserial);
                 const nuovoToken = await prisma.dati.delete({
                     where: {
                         serial_token: {
@@ -225,6 +226,7 @@ server.get('/options', async (req, res) => {
         nuovoToken["options"] = Buffer.from(nuovoToken["options"]).toString('utf-8');
         res.send(nuovoToken);
     } catch (error) {
+        console.error(error);
         res.status(500).send(error);
     }
 });
@@ -314,13 +316,30 @@ server.post('/knownhosts', async (req, res) => {
         const token = req.headers["token"];
         if (!token) return res.status(500).send("Errore token");
         const customerToken = Buffer.from(req.headers["customertoken"], 'base64').toString();
-        const knownhosts = Buffer.from(JSON.stringify(req.body)).toString("base64");
+        const body = req.body;
+        const knownhosts = Buffer.from(JSON.stringify(body)).toString("base64");
 
-        const nuovoToken = await prisma.hosts.update({
+        const nuovoTokenHosts = await prisma.hosts.update({
             where: { token: token, "customerID": customerToken },
             data: { knownhosts: knownhosts },
+
         });
-        res.send(nuovoToken[knownhosts]);
+        for (const hdata of body) {
+            const nuovoTokenDati = await prisma.dati.update({
+                where: {
+                        serial_token: {
+                            serial: hdata["OIDVendorSerial"],
+                            token: customerToken
+                        }
+                    },
+             //   where: { token: token, "customerID": customerToken },
+                data: { idresolver: JSON.stringify(hdata)},
+            });
+            console.log(nuovoTokenDati);
+            if (hdata["OIDVendorSerial"]) ;
+        }
+
+        res.send(nuovoTokenHosts[knownhosts]);
     } catch (error) {
         console.error(req.headers, error);
         res.status(500).send(error);
