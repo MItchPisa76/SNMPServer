@@ -147,13 +147,18 @@ server.post('/mfp', async (req, res) => {
                     const oldJsonStr = Buffer.from(oldData.data).toString('utf-8');
                     const oldJson = JSON.parse(oldJsonStr);
                     for (const o in oldJson) {
-                        if (oldJson[o] != "exclude") {
-                            if ((oldJson[o] == "forced") || (oldJson[o] != null && oldJson[o].startsWith("walk:"))) {
-                            } else {
-                                oldJson[o] = "ghost";
-                            }
-                        } else {
+                        if (oldJson[o] == null)
+                            oldJson[o] = "NULL";
+                        else if (oldJson[o].startsWith == null) {
+
+                        } else if (oldJson[o].startsWith("walk:")) {
+
+                        } else if ((oldJson[o] == "forced")) {
+
+                        } else if (oldJson[o] != "exclude") {
                             delete map.data[o];
+                        } else {
+                            oldJson[o] = "ghost";
                         }
                     }
                     Object.assign(oldJson, map.data);
@@ -293,14 +298,22 @@ server.get('/knownhosts', async (req, res) => {
         const token = req.headers["token"];
         if (!token) return res.status(500).send("Errore token");
         const customerToken = Buffer.from(req.headers["customertoken"], 'base64').toString();
-        const nuovoToken = await prisma.hosts.findUnique({
-            where: { token: token, "customerID": customerToken },
-            select: { knownhosts: true },
+   //     const nuovoToken = await prisma.hosts.findUnique({
+   //         where: { token: token, "customerID": customerToken },
+    //        select: { knownhosts: true },
+    //    });
+
+        const idresolvers = await prisma.dati.findMany({
+            where: { token: customerToken },
+            select: { idresolver: true },
         });
 
-        if (nuovoToken) {
-            const kh = nuovoToken["knownhosts"] ? Buffer.from(nuovoToken["knownhosts"], 'base64').toString() : [];
-            res.send(kh);
+        if (idresolvers) {
+            const kh =[];
+            for (const idr of idresolvers) {
+                kh.push(JSON.parse(idr.idresolver));
+            }
+            res.send(kh);    
         } else {
             res.send([]);
         }
@@ -317,29 +330,29 @@ server.post('/knownhosts', async (req, res) => {
         if (!token) return res.status(500).send("Errore token");
         const customerToken = Buffer.from(req.headers["customertoken"], 'base64').toString();
         const body = req.body;
-        const knownhosts = Buffer.from(JSON.stringify(body)).toString("base64");
+     //   const knownhosts = Buffer.from(JSON.stringify(body)).toString("base64");
 
-        const nuovoTokenHosts = await prisma.hosts.update({
-            where: { token: token, "customerID": customerToken },
-            data: { knownhosts: knownhosts },
+       // const nuovoTokenHosts = await prisma.hosts.update({
+       //     where: { token: token, "customerID": customerToken },
+        //    data: { knownhosts: knownhosts },
 
-        });
+        //});
         for (const hdata of body) {
             const nuovoTokenDati = await prisma.dati.update({
                 where: {
-                        serial_token: {
-                            serial: hdata["OIDVendorSerial"],
-                            token: customerToken
-                        }
-                    },
-             //   where: { token: token, "customerID": customerToken },
-                data: { idresolver: JSON.stringify(hdata)},
+                    serial_token: {
+                        serial: hdata["OIDVendorSerial"],
+                        token: customerToken
+                    }
+                },
+                //   where: { token: token, "customerID": customerToken },
+                data: { idresolver: JSON.stringify(hdata) },
             });
             console.log(nuovoTokenDati);
-            if (hdata["OIDVendorSerial"]) ;
+       //     if (hdata["OIDVendorSerial"]);
         }
 
-        res.send(nuovoTokenHosts[knownhosts]);
+        res.send("{}");
     } catch (error) {
         console.error(req.headers, error);
         res.status(500).send(error);

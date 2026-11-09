@@ -48,7 +48,7 @@
         </td>
 
         <td class="text-break">
-          <strong>
+          <strong class="<%= value.value == 'noSuchObject'? 'text-warning': (value.value == 'noSuchInstance'? 'text-danger':'') %>">
             <%= value.value %>
           </strong>
         </td>

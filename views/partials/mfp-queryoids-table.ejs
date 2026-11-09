@@ -11,20 +11,20 @@
         %>
 <tr data-id="<%= item.id %>" data-oid="<%= item.oid %>" class="<%= state === 'esonera' ? 'table-secondary text-muted' : '' %>">
   <td><code><%= item.oid %></code></td>
-  <td><input type="text" class="form-control form-control-sm f-short" value="<%= item.short || '' %>"></td>
-  <td><input type="text" class="form-control form-control-sm f-brandShort" value="<%= item.brandShort || '' %>"></td>
-  <td><input type="text" class="form-control form-control-sm f-descrizione" value="<%= item.descrizione || '' %>"></td>
-  <td><input type="text" class="form-control form-control-sm f-vendor" value="<%= item.vendoroid || '' %>"></td>
-  <td><input type="text" class="form-control form-control-sm f-origin" value="<%= item.origin || 'aa' %>" disabled></td>
-  <td><input type="number" class="form-control form-control-sm f-priority" value="<%= item.priority %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-short" data-col="short" value="<%= item.short || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-brandShort" data-col="brandShort" value="<%= item.brandShort || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-descrizione" data-col="descrizione" value="<%= item.descrizione || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-vendor" data-col="vendoroid" value="<%= item.vendoroid || '' %>"></td>
+  <td><input type="text" class="form-control form-control-sm f-origin" data-col="origin" value="<%= item.origin || 'aa' %>" disabled></td>
+  <td><input type="number" class="form-control form-control-sm f-priority" data-col="priority" value="<%= item.priority %>"></td>
   <td class="text-center align-middle">
     <div class="d-flex justify-content-center gap-2 flex-wrap align-items-center">
       <div class="form-check me-1" title="Bit 1 (& 1)">
-        <input class="form-check-input f-mode-bit1" type="checkbox" <%= hasBit1 ? 'checked' : '' %>>
-        <label class="form-check-label small">forced</label>
+        <input class="form-check-input f-mode-bit1" type="checkbox" data-col="forced-ck" <%= hasBit1 ? 'checked' : '' %>>
+        <label class="form-check-label small"  >forced</label>
       </div>
       <div class="form-check me-2" title="Bit 2 (& 2)">
-        <input class="form-check-input f-mode-bit2" type="checkbox" <%= hasBit2 ? 'checked' : '' %>>
+        <input class="form-check-input f-mode-bit2" type="checkbox" data-col="tree-ck" <%= hasBit2 ? 'checked' : '' %>>
         <label class="form-check-label small">walk</label>
       </div>
 

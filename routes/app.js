@@ -318,8 +318,12 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
 
             dati["data"] = Buffer.from(dati["data"]).toString('utf-8');
             dati["data"] = JSON.parse(dati["data"]);
+            //   dati["datainfo"] = JSON.parse(dati["datainfo"]);
+            dati["data"][body.oid + ":info"] = body.dataInputs;
             dati["data"][body.oid] = body.id;
 
+            //     dati["data"][body.oid].oid = body.oid;
+            //dati["data"][body.oid] = JSON.stringify(dati["data"][ body.oid]);
             dati["data"] = JSON.stringify(dati["data"]);
             dati["data"] = Buffer.from(dati["data"]).toString("base64");
             const cdati = await prisma.dati.update({
@@ -497,7 +501,7 @@ module.exports = function (prisma, sessions_Data, snmpQueries) {
             let walkoid = req.headers["walkoid"];
             const queryData = queryDatas[walkoid] ? queryDatas[walkoid].value : null;
             if (walkoid == null) {
-                count = -1
+                count = 0;
             }
             for (const o in queryData) {
                 count++;

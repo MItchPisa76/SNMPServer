@@ -18,7 +18,9 @@ console.log(mfp)%>
                         <%= modello %>
                     </strong>
                     <span class="text-muted small" title="<%= mfp.idresolver %>">(S/N: <code><%= mfp.serial %></code> | IPv4:
+                        <% if (mfp.idresolver) {%>
                         <code><%= mfp.idresolver.ipV4address %></code> | MAC: <code><%= mfp.idresolver["OIDMACADDR"] %></code>)</span>
+                        <% }%>
                 </div>
 
                 <div>

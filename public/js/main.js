@@ -344,14 +344,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (input.dataset.name == id)
                 input.classList.add("active");
         });
-
+        const TR = OIDDiv.closest("tr");
+        const inputs = TR.querySelectorAll("input");
+        const dataInputs = {}
+        for (const i of inputs) {
+            dataInputs[i.dataset.col] = i.value;
+        }
         const oid = OIDDiv.dataset.oid;
         const response = (await fetch(`/oids/${serial}/update`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', "customertoken": tokenCustomer },
             body: JSON.stringify({
                 id,
-                oid
+                oid,
+                dataInputs
             })
         }));
         console.log(params);
